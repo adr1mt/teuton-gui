@@ -11,25 +11,9 @@ repositorio empezado de cero.
 
 `npm run typecheck` y `npm test` (70 tests) pasan.
 
-## Cómo se abre la app (importante)
-
-Desde el **menú de aplicaciones**, buscando «Teutón GUI». Esa entrada no ejecuta el
-código del repositorio: ejecuta el AppImage instalado en
-`/mnt/datos/Aplicaciones/TeutonGUI/TeutonGUI.AppImage`.
-
-Por eso, **después de cualquier cambio de código hay que reinstalar**, o la app del
-menú sigue siendo la de antes:
-
-```bash
-./scripts/instalar.sh
-```
-
-Compila si detecta cambios, copia el AppImage a `/mnt/datos` y actualiza la entrada del
-menú. `--forzar` recompila siempre; `--desinstalar` lo quita todo. `./launch.sh` sigue
-existiendo para pruebas rápidas desde el código, pero no es lo que se usa a diario.
-
-El ejecutable vive fuera de la carpeta personal a propósito: la partición `/` está al
-96%. Nada pesado debe ir allí.
+Este documento cuenta **el estado**: dónde estamos, qué se decidió y qué queda. Las
+reglas de trabajo (reinstalar tras cada cambio, dónde van los ficheros pesados, qué no
+tocar) viven en `CLAUDE.md` y no se repiten aquí.
 
 ## Lo último que se ha tocado (2026-08-10)
 

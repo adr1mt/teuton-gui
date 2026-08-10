@@ -26,6 +26,7 @@ npm run dist:linux         # build + electron-builder (AppImage + deb) -> dist/
 ./launch.sh                 # builds if needed, kills stale instances, launches with --no-sandbox
 npm run icon               # regenerates build/icon.png + build/icons/*.png (pure-Python, no deps)
 ./scripts/instalar.sh      # builds the AppImage, installs it to /mnt/datos + the desktop menu
+                           #   --forzar rebuilds unconditionally; --desinstalar removes everything
 ```
 
 **Always finish a code change by running `./scripts/instalar.sh`, and say so in the summary.** The user
@@ -34,6 +35,11 @@ them — they'd be testing the previous build without knowing it. The menu entry
 (`~/.local/share/applications/teuton-gui.desktop`) points at
 `/mnt/datos/Aplicaciones/TeutonGUI/TeutonGUI.AppImage`, not at `launch.sh`. `launch.sh` still exists for
 quick dev runs from source, but it is not what the user launches.
+
+**Always finish a feature-level change by updating `docs/HANDOFF.md`** — it's the project's memory
+between sessions (what exists, what's pending, what was decided and why). Update it in the same commit as
+the change, not later. Typo fixes and trivial refactors don't need an entry; anything that changes
+behaviour, the UI, or a decision does.
 
 **Nothing large goes on `/`** — that partition is ~96% full (a few GB free). The executable lives under
 `/mnt/datos`, and any bulky file the app generates must default there too (Teutón's reports already land
