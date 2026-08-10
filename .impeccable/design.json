@@ -1,0 +1,580 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-09T00:00:00Z",
+  "title": "Design System: Teutón GUI",
+  "extensions": {
+    "colorMeta": {
+      "signal-blue": {
+        "role": "primary",
+        "displayName": "Azul Señal",
+        "canonical": "hsl(217 91% 55%)",
+        "dark": "hsl(213 94% 68%)",
+        "cssVar": "--primary",
+        "tonalRamp": [
+          "hsl(217 91% 15%)",
+          "hsl(217 91% 26%)",
+          "hsl(217 91% 37%)",
+          "hsl(217 91% 48%)",
+          "hsl(217 91% 59%)",
+          "hsl(217 91% 70%)",
+          "hsl(217 91% 84%)",
+          "hsl(217 91% 95%)"
+        ]
+      },
+      "ink-night": {
+        "role": "neutral",
+        "displayName": "Tinta Nocturna",
+        "canonical": "hsl(222 47% 11%)",
+        "dark": "hsl(220 14% 96%)",
+        "cssVar": "--foreground / --sidebar",
+        "tonalRamp": [
+          "hsl(222 47% 5%)",
+          "hsl(222 47% 11%)",
+          "hsl(222 40% 20%)",
+          "hsl(222 34% 32%)",
+          "hsl(222 28% 46%)",
+          "hsl(222 24% 62%)",
+          "hsl(222 20% 80%)",
+          "hsl(222 18% 95%)"
+        ]
+      },
+      "classroom-white": {
+        "role": "neutral",
+        "displayName": "Blanco Aula",
+        "canonical": "hsl(220 27% 98%)",
+        "dark": "hsl(222 47% 7%)",
+        "cssVar": "--background",
+        "tonalRamp": [
+          "hsl(220 27% 15%)",
+          "hsl(220 25% 27%)",
+          "hsl(220 22% 40%)",
+          "hsl(220 20% 54%)",
+          "hsl(220 20% 68%)",
+          "hsl(220 22% 82%)",
+          "hsl(220 25% 92%)",
+          "hsl(220 27% 98%)"
+        ]
+      },
+      "surface-card": {
+        "role": "neutral",
+        "displayName": "Superficie Tarjeta",
+        "canonical": "hsl(0 0% 100%)",
+        "dark": "hsl(222 40% 11%)",
+        "cssVar": "--card / --popover",
+        "tonalRamp": [
+          "hsl(0 0% 15%)",
+          "hsl(0 0% 27%)",
+          "hsl(0 0% 40%)",
+          "hsl(0 0% 54%)",
+          "hsl(0 0% 68%)",
+          "hsl(0 0% 82%)",
+          "hsl(0 0% 92%)",
+          "hsl(0 0% 100%)"
+        ]
+      },
+      "quiet-grey": {
+        "role": "neutral",
+        "displayName": "Gris Callado",
+        "canonical": "hsl(220 14% 96%)",
+        "dark": "hsl(222 30% 16%)",
+        "cssVar": "--muted / --secondary",
+        "tonalRamp": [
+          "hsl(220 14% 15%)",
+          "hsl(220 14% 27%)",
+          "hsl(220 14% 40%)",
+          "hsl(220 14% 54%)",
+          "hsl(220 14% 68%)",
+          "hsl(220 14% 82%)",
+          "hsl(220 14% 91%)",
+          "hsl(220 14% 96%)"
+        ]
+      },
+      "quiet-grey-ink": {
+        "role": "neutral",
+        "displayName": "Tinta Callada",
+        "canonical": "hsl(220 9% 46%)",
+        "dark": "hsl(220 10% 60%)",
+        "cssVar": "--muted-foreground",
+        "tonalRamp": [
+          "hsl(220 9% 15%)",
+          "hsl(220 9% 26%)",
+          "hsl(220 9% 36%)",
+          "hsl(220 9% 46%)",
+          "hsl(220 9% 58%)",
+          "hsl(220 9% 70%)",
+          "hsl(220 9% 84%)",
+          "hsl(220 9% 95%)"
+        ]
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Filete",
+        "canonical": "hsl(220 13% 91%)",
+        "dark": "hsl(222 25% 20%)",
+        "cssVar": "--border",
+        "tonalRamp": [
+          "hsl(220 13% 15%)",
+          "hsl(220 13% 27%)",
+          "hsl(220 13% 40%)",
+          "hsl(220 13% 54%)",
+          "hsl(220 13% 68%)",
+          "hsl(220 13% 82%)",
+          "hsl(220 13% 91%)",
+          "hsl(220 13% 96%)"
+        ]
+      },
+      "blue-wash": {
+        "role": "secondary",
+        "displayName": "Lavado Azul",
+        "canonical": "hsl(214 100% 96%)",
+        "dark": "hsl(217 45% 24%)",
+        "cssVar": "--accent",
+        "tonalRamp": [
+          "hsl(214 60% 15%)",
+          "hsl(214 62% 26%)",
+          "hsl(214 66% 38%)",
+          "hsl(214 72% 50%)",
+          "hsl(214 80% 64%)",
+          "hsl(214 90% 78%)",
+          "hsl(214 100% 89%)",
+          "hsl(214 100% 96%)"
+        ]
+      },
+      "pass-green": {
+        "role": "tertiary",
+        "displayName": "Verde Aprobado",
+        "canonical": "hsl(142 76% 29%)",
+        "dark": "hsl(142 65% 47%)",
+        "cssVar": "--success",
+        "tonalRamp": [
+          "hsl(142 76% 12%)",
+          "hsl(142 76% 20%)",
+          "hsl(142 76% 29%)",
+          "hsl(142 74% 38%)",
+          "hsl(142 68% 50%)",
+          "hsl(142 64% 64%)",
+          "hsl(142 62% 80%)",
+          "hsl(142 60% 94%)"
+        ]
+      },
+      "pass-green-strong": {
+        "role": "tertiary",
+        "displayName": "Verde Aprobado Fuerte",
+        "canonical": "hsl(142 78% 24%)",
+        "dark": "hsl(142 62% 60%)",
+        "cssVar": "--success-strong",
+        "tonalRamp": [
+          "hsl(142 78% 10%)",
+          "hsl(142 78% 17%)",
+          "hsl(142 78% 24%)",
+          "hsl(142 74% 34%)",
+          "hsl(142 68% 46%)",
+          "hsl(142 64% 60%)",
+          "hsl(142 62% 78%)",
+          "hsl(142 60% 93%)"
+        ]
+      },
+      "partial-amber": {
+        "role": "tertiary",
+        "displayName": "Ámbar Parcial",
+        "canonical": "hsl(38 92% 50%)",
+        "dark": "hsl(38 92% 55%)",
+        "cssVar": "--warning",
+        "tonalRamp": [
+          "hsl(38 92% 15%)",
+          "hsl(38 92% 24%)",
+          "hsl(38 92% 33%)",
+          "hsl(38 92% 42%)",
+          "hsl(38 92% 50%)",
+          "hsl(38 92% 65%)",
+          "hsl(38 92% 80%)",
+          "hsl(38 92% 94%)"
+        ]
+      },
+      "partial-amber-strong": {
+        "role": "tertiary",
+        "displayName": "Ámbar Parcial Fuerte",
+        "canonical": "hsl(32 95% 30%)",
+        "dark": "hsl(38 95% 68%)",
+        "cssVar": "--warning-strong",
+        "tonalRamp": [
+          "hsl(32 95% 12%)",
+          "hsl(32 95% 21%)",
+          "hsl(32 95% 30%)",
+          "hsl(32 95% 40%)",
+          "hsl(32 95% 52%)",
+          "hsl(32 95% 66%)",
+          "hsl(32 95% 81%)",
+          "hsl(32 95% 94%)"
+        ]
+      },
+      "fail-red": {
+        "role": "tertiary",
+        "displayName": "Rojo Caído",
+        "canonical": "hsl(0 72% 51%)",
+        "dark": "hsl(0 72% 58%)",
+        "cssVar": "--destructive",
+        "tonalRamp": [
+          "hsl(0 72% 15%)",
+          "hsl(0 72% 25%)",
+          "hsl(0 72% 34%)",
+          "hsl(0 72% 43%)",
+          "hsl(0 72% 51%)",
+          "hsl(0 72% 65%)",
+          "hsl(0 72% 81%)",
+          "hsl(0 72% 95%)"
+        ]
+      },
+      "fail-red-strong": {
+        "role": "tertiary",
+        "displayName": "Rojo Caído Fuerte",
+        "canonical": "hsl(0 74% 38%)",
+        "dark": "hsl(0 85% 74%)",
+        "cssVar": "--destructive-strong",
+        "tonalRamp": [
+          "hsl(0 74% 12%)",
+          "hsl(0 74% 20%)",
+          "hsl(0 74% 29%)",
+          "hsl(0 74% 38%)",
+          "hsl(0 74% 50%)",
+          "hsl(0 74% 64%)",
+          "hsl(0 74% 80%)",
+          "hsl(0 74% 94%)"
+        ]
+      },
+      "console-ink": {
+        "role": "neutral",
+        "displayName": "Tinta de Consola",
+        "canonical": "hsl(222 47% 6%)",
+        "dark": "hsl(222 47% 4%)",
+        "cssVar": "--console",
+        "tonalRamp": [
+          "hsl(222 47% 4%)",
+          "hsl(222 47% 6%)",
+          "hsl(222 47% 12%)",
+          "hsl(222 47% 20%)",
+          "hsl(222 47% 32%)",
+          "hsl(222 47% 50%)",
+          "hsl(222 47% 72%)",
+          "hsl(222 47% 92%)"
+        ]
+      },
+      "console-paper": {
+        "role": "neutral",
+        "displayName": "Papel de Consola",
+        "canonical": "hsl(220 14% 86%)",
+        "dark": "hsl(220 14% 86%)",
+        "cssVar": "--console-foreground",
+        "tonalRamp": [
+          "hsl(220 14% 15%)",
+          "hsl(220 14% 27%)",
+          "hsl(220 14% 40%)",
+          "hsl(220 14% 54%)",
+          "hsl(220 14% 68%)",
+          "hsl(220 14% 80%)",
+          "hsl(220 14% 86%)",
+          "hsl(220 14% 96%)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "marker": {
+        "displayName": "Marker",
+        "purpose": "Las tres lecturas del marcador en Resultados (aprobados, nota media, requieren atención). El único escalón dimensionado para leerse desde el fondo del aula. Siempre tabular."
+      },
+      "marker-lg": {
+        "displayName": "Marker LG",
+        "purpose": "El mismo escalón a partir de 2xl, en un monitor ancho."
+      },
+      "figure": {
+        "displayName": "Figure",
+        "purpose": "La nota de un alumno en el listado y en su detalle. La segunda cosa que se lee a distancia. Siempre tabular."
+      },
+      "name": {
+        "displayName": "Name",
+        "purpose": "El nombre del alumno en el listado. Deliberadamente por encima del cuerpo: la persona y su nota son el contenido."
+      },
+      "ui": {
+        "displayName": "UI",
+        "purpose": "Título de vista. Uno por pantalla, siempre dentro de la ViewHeader."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Títulos de sección (SectionTitle), filas destacadas, etiquetas de botón."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "El cuerpo real de la aplicación, 14px. Densidad de instrumento, no de lectura."
+      },
+      "dense": {
+        "displayName": "Dense",
+        "purpose": "Avisos, celdas de la matriz, salida del CLI. Un escalón por debajo del cuerpo, para lo que se escanea y no se lee."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Metadatos y contexto en las cabeceras."
+      },
+      "micro": {
+        "displayName": "Micro",
+        "purpose": "Rótulo de una lectura del marcador y cabecera de tabla. El único uso de mayúsculas del sistema."
+      },
+      "glyph": {
+        "displayName": "Glyph",
+        "purpose": "El texto dentro de un chip de la matriz y de la leyenda."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Identificadores de caso, rutas, IPs y salida del CLI. Nada más. Siempre tabular."
+      }
+    },
+    "shadows": [
+      {
+        "name": "desplegada",
+        "value": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
+        "purpose": "Menús de desbordamiento y popovers. Va bajo algo que se cierra."
+      },
+      {
+        "name": "modal",
+        "value": "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)",
+        "purpose": "Diálogo de confirmación, sobre velo bg-foreground/30 con desenfoque de 2px."
+      }
+    ],
+    "motion": [
+      {
+        "name": "transicion-color",
+        "value": "150ms cubic-bezier(0.4, 0, 0.2, 1)",
+        "purpose": "Transición por defecto de todos los controles. Solo color: nada escala, rebota ni se hunde."
+      },
+      {
+        "name": "fade-in",
+        "value": "fade-in 0.2s ease-out — from { opacity: 0; transform: translateY(4px) } to { opacity: 1; transform: none }",
+        "purpose": "Entrada de vista, menú y diálogo. El único desplazamiento permitido, y de 4px."
+      },
+      {
+        "name": "progreso",
+        "value": "width 500ms cubic-bezier(0, 0, 0.2, 1)",
+        "purpose": "Avance de la barra de progreso durante una ejecución."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "lg",
+        "value": "1024px",
+        "purpose": "Rejilla de dos columnas de Analíticas y del índice del manual."
+      },
+      {
+        "name": "xl",
+        "value": "1280px",
+        "purpose": "Listado de alumnos a dos columnas, para que una clase de treinta entre sin scroll."
+      },
+      {
+        "name": "2xl",
+        "value": "1536px",
+        "purpose": "El marcador sube de marker a marker-lg. No hay layout móvil: es una única ventana de escritorio."
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "La única acción en azul lleno de una pantalla. Plano: en un sistema de tono más filete, la sombra bajo un botón solo ensucia el borde al proyectar.",
+      "html": "<button class=\"ds-btn-primary\">Ejecutar test</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 8px 16px; border: none; border-radius: calc(var(--radius) - 2px); background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); font-family: Inter, system-ui, sans-serif; font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: background-color 150ms cubic-bezier(0.4,0,0.2,1); } .ds-btn-primary:hover { background: hsl(var(--primary) / 0.9); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 1px hsl(var(--background)), 0 0 0 3px hsl(var(--ring)); } .ds-btn-primary:disabled { opacity: 0.5; pointer-events: none; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "El modo por defecto de una barra de herramientas. Contorno de 1px sobre transparente; al pasar por encima toma el lavado azul.",
+      "html": "<button class=\"ds-btn-outline\">Cargar últimos resultados</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 36px; padding: 8px 16px; border: 1px solid hsl(var(--input)); border-radius: calc(var(--radius) - 2px); background: transparent; color: hsl(var(--foreground)); font-family: Inter, system-ui, sans-serif; font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: background-color 150ms cubic-bezier(0.4,0,0.2,1), color 150ms cubic-bezier(0.4,0,0.2,1); } .ds-btn-outline:hover { background: hsl(var(--accent)); color: hsl(var(--accent-foreground)); } .ds-btn-outline:focus-visible { outline: none; box-shadow: 0 0 0 1px hsl(var(--background)), 0 0 0 3px hsl(var(--ring)); }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Campo de 36px sobre el lienzo. El foco añade anillo; el borde no cambia de grosor, para que nada se mueva de sitio.",
+      "html": "<input class=\"ds-input\" placeholder=\"Filtrar alumno...\" />",
+      "css": ".ds-input { display: flex; height: 36px; width: 100%; padding: 4px 12px; border: 1px solid hsl(var(--input)); border-radius: calc(var(--radius) - 2px); background: hsl(var(--background)); color: hsl(var(--foreground)); font-family: Inter, system-ui, sans-serif; font-size: 0.875rem; transition: border-color 150ms cubic-bezier(0.4,0,0.2,1); } .ds-input::placeholder { color: hsl(var(--muted-foreground)); } .ds-input:focus-visible { outline: none; box-shadow: 0 0 0 2px hsl(var(--ring)); } .ds-input:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "refersTo": "badge-success",
+      "description": "Píldora de estado, nunca un control. El texto va SIEMPRE en la variante «-strong»: color puro sobre su propio tinte es el fallo de contraste que estos tokens vinieron a arreglar.",
+      "html": "<span class=\"ds-badge-success\">Teutón detectado</span><span class=\"ds-badge-warning\">Sin guardar</span><span class=\"ds-badge-destructive\">Host caído</span>",
+      "css": ".ds-badge-success, .ds-badge-warning, .ds-badge-destructive { display: inline-flex; align-items: center; margin-right: 8px; padding: 2px 10px; border-radius: 9999px; font-family: Inter, system-ui, sans-serif; font-size: 0.75rem; font-weight: 500; } .ds-badge-success { background: hsl(var(--success) / 0.15); color: hsl(var(--success-strong)); } .ds-badge-warning { background: hsl(var(--warning) / 0.15); color: hsl(var(--warning-strong)); } .ds-badge-destructive { background: hsl(var(--destructive) / 0.15); color: hsl(var(--destructive-strong)); }"
+    },
+    {
+      "name": "Sidebar Nav Item",
+      "kind": "nav",
+      "refersTo": "nav-item-active",
+      "description": "Lista vertical sobre tinta. El ítem activo lleva fondo azul/20, texto blanco y una pestaña de 4x20px pegada al borde izquierdo: la marca de posición del sistema. Lo que necesita proyecto abierto se desactiva al 30%, no se esconde.",
+      "html": "<div class=\"ds-nav\"><button class=\"ds-nav-item ds-nav-item--active\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"12\" y1=\"20\" x2=\"12\" y2=\"10\"/><line x1=\"18\" y1=\"20\" x2=\"18\" y2=\"4\"/><line x1=\"6\" y1=\"20\" x2=\"6\" y2=\"16\"/></svg>Analíticas</button><button class=\"ds-nav-item\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"10\"/><polygon points=\"10 8 16 12 10 16 10 8\"/></svg>Ejecutar</button><button class=\"ds-nav-item ds-nav-item--disabled\">Editor</button></div>",
+      "css": ".ds-nav { display: flex; flex-direction: column; gap: 2px; width: 240px; padding: 12px; background: hsl(var(--sidebar)); } .ds-nav-item { position: relative; display: flex; align-items: center; gap: 12px; padding: 8px 12px; border: none; border-radius: calc(var(--radius) - 2px); background: transparent; color: hsl(var(--sidebar-foreground) / 0.7); font-family: Inter, system-ui, sans-serif; font-size: 0.875rem; font-weight: 500; text-align: left; cursor: pointer; transition: background-color 150ms cubic-bezier(0.4,0,0.2,1), color 150ms cubic-bezier(0.4,0,0.2,1); } .ds-nav-item:hover { background: rgb(255 255 255 / 0.05); color: #fff; } .ds-nav-item--active { background: hsl(var(--primary) / 0.2); color: #fff; } .ds-nav-item--active::before { content: ''; position: absolute; left: 0; top: 50%; width: 4px; height: 20px; transform: translateY(-50%); border-radius: 0 9999px 9999px 0; background: hsl(var(--primary)); } .ds-nav-item--disabled { opacity: 0.3; cursor: not-allowed; } .ds-nav-item--disabled:hover { background: transparent; color: hsl(var(--sidebar-foreground) / 0.7); }"
+    },
+    {
+      "name": "View Header",
+      "kind": "custom",
+      "refersTo": "view-header",
+      "description": "El único spec de cabecera de la app: barra fija de 56px con el título a la izquierda, el contexto justo detrás y los controles al final. Es el único sitio donde vive el título de una vista, y las ocho empiezan igual.",
+      "html": "<header class=\"ds-view-header\"><h1 class=\"ds-view-header__title\">Analíticas</h1><span class=\"ds-chip\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 10v6M2 10l10-5 10 5-10 5z\"/><path d=\"M6 12v5c3 3 9 3 12 0v-5\"/></svg>SMX2 A</span><span class=\"ds-view-header__meta\">26 alumnos · nota media <strong>3,79</strong> · 7 aprobados</span></header>",
+      "css": ".ds-view-header { display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 24px; border-bottom: 1px solid hsl(var(--border)); background: transparent; font-family: Inter, system-ui, sans-serif; } .ds-view-header__title { margin: 0; font-size: 0.9375rem; font-weight: 600; letter-spacing: -0.01em; color: hsl(var(--foreground)); } .ds-view-header__meta { font-size: 0.75rem; color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums lining-nums; } .ds-view-header__meta strong { color: hsl(var(--foreground)); font-weight: 600; } .ds-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: calc(var(--radius) - 2px); background: hsl(var(--accent)); color: hsl(var(--accent-foreground)); font-size: 0.75rem; font-weight: 500; }"
+    },
+    {
+      "name": "Section Title",
+      "kind": "custom",
+      "refersTo": "section-title",
+      "description": "Encabezado de bloque con filete inferior y una pista opcional al lado. SUSTITUYE a la tarjeta como contenedor de sección: en Ajustes y Analíticas lo que agrupa es la regla de 1px y el aire, no una caja.",
+      "html": "<div class=\"ds-section-title\"><h2>Atención prioritaria</h2><span class=\"ds-section-title__count\">19</span><p>Hosts caídos primero, después las notas por debajo del aprobado.</p></div>",
+      "css": ".ds-section-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid hsl(var(--border)); font-family: Inter, system-ui, sans-serif; } .ds-section-title h2 { margin: 0; font-size: 0.875rem; font-weight: 600; letter-spacing: -0.01em; color: hsl(var(--foreground)); } .ds-section-title__count { font-size: 0.875rem; color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums lining-nums; } .ds-section-title p { margin: 0; font-size: 0.75rem; color: hsl(var(--muted-foreground)); }"
+    },
+    {
+      "name": "Segmented Control",
+      "kind": "custom",
+      "refersTo": "segmented-item-active",
+      "description": "El único control segmentado de la app (Lista/Matriz, pestañas del Editor). El activo toma el gris callado; anuncia siempre aria-pressed.",
+      "html": "<div class=\"ds-segmented\" role=\"group\"><button class=\"ds-segmented__item ds-segmented__item--active\" aria-pressed=\"true\">Lista</button><button class=\"ds-segmented__item\" aria-pressed=\"false\">Matriz</button></div>",
+      "css": ".ds-segmented { display: inline-flex; align-items: center; padding: 2px; border: 1px solid hsl(var(--border)); border-radius: calc(var(--radius) - 2px); font-family: Inter, system-ui, sans-serif; } .ds-segmented__item { display: flex; align-items: center; gap: 6px; padding: 4px 10px; border: none; border-radius: 0.25rem; background: transparent; color: hsl(var(--muted-foreground)); font-size: 0.75rem; font-weight: 500; cursor: pointer; transition: background-color 150ms cubic-bezier(0.4,0,0.2,1), color 150ms cubic-bezier(0.4,0,0.2,1); } .ds-segmented__item:hover { color: hsl(var(--foreground)); } .ds-segmented__item--active { background: hsl(var(--secondary)); color: hsl(var(--foreground)); } .ds-segmented__item:focus-visible { outline: none; box-shadow: 0 0 0 2px hsl(var(--ring)); }"
+    },
+    {
+      "name": "Scoreboard Reading",
+      "kind": "custom",
+      "refersTo": "scoreboard-reading",
+      "description": "Componente firma. Tres lecturas —aprobados, nota media, requieren atención— en una banda fija de tres columnas separadas por filete, SIN tarjeta: una caja alrededor de una cifra de 36-44px solo le roba contraste. La tercera además filtra el listado, y entonces es un button con aria-pressed que toma fondo azul/10 sin mover un píxel.",
+      "html": "<div class=\"ds-scoreboard\"><div class=\"ds-reading\"><div class=\"ds-reading__label\">Aprobados</div><div class=\"ds-reading__value ds-reading__value--fail\">7/26</div><div class=\"ds-reading__hint\">27%</div></div><div class=\"ds-reading\"><div class=\"ds-reading__label\">Nota media</div><div class=\"ds-reading__value ds-reading__value--fail\">3,79</div><div class=\"ds-reading__hint\">53 pts Teutón</div></div><button class=\"ds-reading ds-reading--active\" aria-pressed=\"true\"><div class=\"ds-reading__label\">Requieren atención</div><div class=\"ds-reading__value ds-reading__value--fail\">19</div><div class=\"ds-reading__hint\">2 con hosts caídos</div></button></div>",
+      "css": ".ds-scoreboard { display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 1px solid hsl(var(--border)); font-family: Inter, system-ui, sans-serif; } .ds-reading { padding: 20px 24px; border: none; border-left: 1px solid hsl(var(--border)); background: transparent; text-align: left; cursor: default; transition: background-color 150ms cubic-bezier(0.4,0,0.2,1); } .ds-reading:first-child { border-left: none; } .ds-reading__label { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: hsl(var(--muted-foreground)); } .ds-reading__value { margin-top: 6px; font-size: 2.25rem; font-weight: 700; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums lining-nums; color: hsl(var(--foreground)); } .ds-reading__value--pass { color: hsl(var(--success-strong)); } .ds-reading__value--fail { color: hsl(var(--destructive-strong)); } .ds-reading__hint { margin-top: 8px; font-size: 0.75rem; color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums lining-nums; } button.ds-reading { cursor: pointer; } button.ds-reading:hover { background: hsl(var(--muted) / 0.5); } .ds-reading--active { background: hsl(var(--primary) / 0.1); } button.ds-reading:focus-visible { outline: none; box-shadow: inset 0 0 0 2px hsl(var(--ring)); }"
+    },
+    {
+      "name": "Roster Row",
+      "kind": "custom",
+      "refersTo": "roster-row",
+      "description": "Componente firma. Una fila por alumno, a dos columnas en pantalla ancha. Solo tres cosas: glifo de estado de 28px, nombre con su medidor de objetivos, y la nota en figure teñida con la variante -strong. El caso y los puntos crudos viven en el detalle — si un dato no ayuda a decidir a quién ir a ver, no está en la fila.",
+      "html": "<ul class=\"ds-roster\"><li class=\"ds-roster-row\"><span class=\"ds-tile ds-tile--down\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"2\" y1=\"2\" x2=\"22\" y2=\"22\"/><path d=\"M8.5 16.5a5 5 0 0 1 7 0\"/><path d=\"M2 8.82a15 15 0 0 1 4.17-2.65\"/><path d=\"M10.66 5c4.01-.36 8.14.9 11.34 3.76\"/><path d=\"M16.85 11.25a10 10 0 0 1 2.22 1.68\"/><path d=\"M5 13a10 10 0 0 1 5.24-2.76\"/><line x1=\"12\" y1=\"20\" x2=\"12.01\" y2=\"20\"/></svg></span><div class=\"ds-roster-row__main\"><div class=\"ds-roster-row__name\">Carla Ibáñez</div><div class=\"ds-roster-row__meter\"><div class=\"ds-meter\"><div class=\"ds-meter__fill ds-meter__fill--fail\" style=\"width:0%\"></div></div><span class=\"ds-roster-row__count\">0/17</span></div></div><div class=\"ds-roster-row__grade ds-roster-row__grade--fail\">0,00</div></li><li class=\"ds-roster-row\"><span class=\"ds-tile ds-tile--pass\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><polyline points=\"20 6 9 17 4 12\"/></svg></span><div class=\"ds-roster-row__main\"><div class=\"ds-roster-row__name\">Marc Sanchis</div><div class=\"ds-roster-row__meter\"><div class=\"ds-meter\"><div class=\"ds-meter__fill ds-meter__fill--pass\" style=\"width:88%\"></div></div><span class=\"ds-roster-row__count\">15/17</span></div></div><div class=\"ds-roster-row__grade ds-roster-row__grade--pass\">8,80</div></li></ul>",
+      "css": ".ds-roster { list-style: none; margin: 0; padding: 0; font-family: Inter, system-ui, sans-serif; } .ds-roster-row { display: grid; grid-template-columns: 1.75rem 1fr auto; align-items: center; gap: 0 16px; padding: 12px 4px; border-bottom: 1px solid hsl(var(--border) / 0.7); transition: background-color 150ms cubic-bezier(0.4,0,0.2,1); } .ds-roster-row:hover { background: hsl(var(--muted) / 0.5); } .ds-tile { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: calc(var(--radius) - 4px); } .ds-tile--pass { background: hsl(var(--success)); color: hsl(var(--success-foreground)); } .ds-tile--down { background: hsl(var(--destructive-strong)); color: hsl(var(--card)); } .ds-roster-row__name { font-size: 1.0625rem; font-weight: 600; line-height: 1.2; color: hsl(var(--foreground)); } .ds-roster-row__meter { display: flex; align-items: center; gap: 10px; margin-top: 8px; } .ds-meter { width: 100%; max-width: 14rem; height: 6px; border-radius: 9999px; background: hsl(var(--muted)); overflow: hidden; } .ds-meter__fill { height: 100%; border-radius: 9999px; transition: width 300ms cubic-bezier(0,0,0.2,1); } .ds-meter__fill--pass { background: hsl(var(--success)); } .ds-meter__fill--fail { background: hsl(var(--destructive)); } .ds-roster-row__count { flex-shrink: 0; font-size: 0.75rem; color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums lining-nums; } .ds-roster-row__grade { font-size: 1.75rem; font-weight: 700; line-height: 1; text-align: right; font-variant-numeric: tabular-nums lining-nums; } .ds-roster-row__grade--pass { color: hsl(var(--success-strong)); } .ds-roster-row__grade--fail { color: hsl(var(--destructive-strong)); }"
+    },
+    {
+      "name": "Case Matrix Row",
+      "kind": "custom",
+      "refersTo": "matrix-cell-pass",
+      "description": "Componente firma. Una fila por comprobación, una celda de 24px por alumno. El glifo dentro de cada celda es obligatorio, no decorativo: la matriz se proyecta y tiene que seguir leyéndose si el proyector aplasta los colores o si quien mira no distingue rojo de verde. Ninguna celda puede quedar vacía — un informe ilegible da «?», jamás una fila que desaparece.",
+      "html": "<div class=\"ds-matrix-row\"><span class=\"ds-matrix-row__label\">DHCP: Comprobar gateway <span class=\"ds-matrix-row__weight\">×2</span></span><span class=\"ds-cell ds-cell--pass\">OK</span><span class=\"ds-cell ds-cell--partial\">1</span><span class=\"ds-cell ds-cell--fail\">✕</span><span class=\"ds-cell ds-cell--na\">?</span></div>",
+      "css": ".ds-matrix-row { display: flex; align-items: center; gap: 6px; padding: 4px 0; font-family: Inter, system-ui, sans-serif; } .ds-matrix-row__label { flex: 1; font-size: 0.8125rem; color: hsl(var(--foreground)); } .ds-matrix-row__weight { color: hsl(var(--muted-foreground)); } .ds-cell { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 4px; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums lining-nums; } .ds-cell--pass { background: hsl(var(--success)); color: hsl(var(--success-foreground)); } .ds-cell--partial { background: hsl(var(--warning)); color: hsl(var(--warning-foreground)); } .ds-cell--fail { background: hsl(var(--destructive-strong)); color: hsl(var(--card)); } .ds-cell--na { background: hsl(var(--muted-foreground) / 0.25); color: hsl(var(--foreground)); }"
+    },
+    {
+      "name": "Progress Bar",
+      "kind": "custom",
+      "description": "Avance de una ejecución. Píldora completa: la forma dice «esto es un estado, no un control». Sin total conocido va indeterminada, a un tercio de ancho y con pulso.",
+      "html": "<div class=\"ds-progress\"><div class=\"ds-progress__head\"><span>Ejecutando 26 casos</span><span>62%</span></div><div class=\"ds-progress__track\"><div class=\"ds-progress__fill\" style=\"width:62%\"></div></div></div>",
+      "css": ".ds-progress { width: 100%; font-family: Inter, system-ui, sans-serif; } .ds-progress__head { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 0.75rem; color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums lining-nums; } .ds-progress__track { height: 8px; width: 100%; border-radius: 9999px; background: hsl(var(--muted)); overflow: hidden; } .ds-progress__fill { height: 100%; border-radius: 9999px; background: hsl(var(--primary)); transition: width 500ms cubic-bezier(0,0,0.2,1); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "El marcador del aula",
+    "overview": "Esto es un marcador, no un panel de administración. La pantalla existe para que una persona que está de pie, a tres metros y atendiendo a otro alumno, gire la cabeza y sepa en un segundo quién va bien, quién va a medias y quién está caído. Todo lo demás —editor, ajustes, importar clases— es infraestructura al servicio de ese momento. Cifra grande, glifo de color, y nada compitiendo por la atención alrededor.\n\nLa superficie de trabajo es clara y fría (classroom-white, tarjetas blancas, filetes de 1px), anclada por una barra lateral de tinta oscura que no cambia nunca entre temas: es el marco fijo del marcador. El azul señal se usa con avaricia —navegación activa, foco, un CTA por pantalla— para que el color quede libre y el verde, el ámbar y el rojo signifiquen exclusivamente el estado de un alumno. Cuando en esta interfaz aparece color, es información.\n\nEl sistema ya está tensionado por la proyección: los tokens -strong existen porque el verde y el ámbar puros se quedaban en 2-3:1 sobre superficies teñidas, justo en la nota del alumno y en los chips de la matriz, que es lo que más se ve en el proyector. Esa es la regla de oro del mundo visual: si un valor no aguanta un proyector de aula malo, no entra. Anti-referencia declarada: el cuaderno editorial en papel, con tipografía de lectura y densidad baja. Aquí se escanea, no se lee.",
+    "keyCharacteristics": [
+      "Marcador primero: en Resultados, tres lecturas enormes y una fila por alumno con su nombre y su nota a tamaño de proyector. Los controles caben en una barra de 56px.",
+      "Lateral de tinta fija + lienzo claro; el contraste de zonas orienta antes que el texto.",
+      "Color semántico y racionado: azul = sistema, verde/ámbar/rojo = alumno.",
+      "Densidad de instrumento: cuerpo base de 14px y cero aire decorativo, con la escala grande reservada a lo que se lee a tres metros.",
+      "Contraste calibrado para proyector, con variantes -strong para texto sobre tinte y para toda cifra grande.",
+      "Plano. El filete de 1px y el tono hacen la profundidad; la sombra solo aparece bajo lo que se cierra (menú y diálogo).",
+      "Un solo chasis: ViewHeader + SectionTitle + Segmented en las ocho vistas."
+    ],
+    "rules": [
+      {
+        "name": "La Regla del Color Reservado",
+        "section": "colors",
+        "body": "Verde, ámbar y rojo solo describen el estado de un alumno o del sistema. Ningún gráfico decorativo, ninguna categoría, ninguna marca de sección puede tomarlos prestados: en cuanto el rojo significa dos cosas, el marcador deja de leerse."
+      },
+      {
+        "name": "La Regla del Tinte y el Strong",
+        "section": "colors",
+        "body": "Color puro sobre fondo neutro; variante -strong en cuanto el fondo lleva ese mismo color al 10-15%. La combinación bg-warning/10 + text-warning está prohibida — es exactamente el fallo de contraste que motivó los tokens."
+      },
+      {
+        "name": "La Regla del Único Azul",
+        "section": "colors",
+        "body": "Una pantalla tiene como mucho una acción en azul lleno. Si aparece la segunda, una de las dos pasa a outline."
+      },
+      {
+        "name": "La Regla de la Cifra Tabular",
+        "section": "typography",
+        "body": "Todo número que pueda cambiar en vivo —notas, porcentajes, contadores, cronómetro— lleva la utilidad .tnum (font-variant-numeric: tabular-nums lining-nums). Un dígito que ensancha la columna en mitad de un examen es un parpadeo que roba la mirada."
+      },
+      {
+        "name": "La Regla de los 14px",
+        "section": "typography",
+        "body": "El cuerpo base es 0.875rem en toda la app. Subir a 1rem «para que se lea mejor» rompe la densidad de tabla que hace que quepa una clase entera en pantalla; la legibilidad de lejos se resuelve con marker, figure y name, no subiendo el cuerpo."
+      },
+      {
+        "name": "La Regla del Paso con Nombre",
+        "section": "typography",
+        "body": "text-[1.0625rem] es un error de sistema, no una decisión local. La escala del marcador se decide una vez y se consume por nombre (text-name, text-figure, text-marker)."
+      },
+      {
+        "name": "La Regla del Marco Fijo",
+        "section": "layout",
+        "body": "El lateral, la ViewHeader, la franja de examen y la banda del marcador no hacen scroll nunca. Durante un examen el profesor vuelve al portátil sin contexto: lo que le orienta tiene que estar donde lo dejó."
+      },
+      {
+        "name": "La Regla de la Columna Alineada",
+        "section": "layout",
+        "body": "Una vista con la medida limitada (Ajustes, Inicio, Analíticas, el detalle de un alumno) alinea su columna al margen izquierdo de la página, nunca centrada. Centrarla despega el contenido del título que lo encabeza y deja un canalón vacío que no significa nada."
+      },
+      {
+        "name": "La Regla del Plano en Reposo",
+        "section": "elevation",
+        "body": "Si un elemento no se puede cerrar, no lleva sombra. Ninguna. Elevar una tarjeta al hacer hover sugiere que es descartable."
+      },
+      {
+        "name": "La Regla de la Fila Legible",
+        "section": "components",
+        "body": "Si un dato de la fila de un alumno no ayuda a decidir a quién ir a ver, no está en la fila. Está en el detalle."
+      },
+      {
+        "name": "La Regla del Alumno Presente",
+        "section": "components",
+        "body": "Un informe ilegible produce una celda «?», jamás una fila que desaparece. Ninguna celda de la matriz puede quedar vacía."
+      },
+      {
+        "name": "La Regla de la Frontera Exacta",
+        "section": "components",
+        "body": "Un umbral se dibuja donde está, no en el centro de la barra más cercana. La ReferenceLine del aprobado va sobre un eje numérico oculto y paralelo (xAxisId=\"pos\", dominio [0,10], posición passScore/10), porque sobre el eje de categorías Recharts la centraba en la barra y parecía partir en dos un tramo entero. Rotulada con el valor (aprobado ≥ 70), no con la palabra sola."
+      },
+      {
+        "name": "La Regla de la Vista que no es una Lista",
+        "section": "components",
+        "body": "Analíticas resume; Resultados enumera. Cualquier listado de alumnos en Analíticas se recorta (ocho filas) y cede el resto a un enlace que salta a Resultados con el filtro ya puesto. Sin el tope, una clase floja empujaba los gráficos —el contenido propio de la vista— por debajo del pliegue."
+      }
+    ],
+    "dos": [
+      "Do poner un glifo o una etiqueta dentro de cualquier indicador de color. El color es refuerzo; el significado tiene que sobrevivir a un proyector y a un daltónico.",
+      "Do usar la variante -strong para todo texto sobre una superficie teñida con su propio color (text-warning-strong sobre bg-warning/10) y para toda cifra grande sobre el lienzo: a 28-44px el rojo puro se queda en ~4:1 y el proyector se lo come.",
+      "Do abrir cada vista con ViewHeader y agrupar con SectionTitle. Dos vistas cualesquiera tienen que empezar igual.",
+      "Do consumir la tipografía por su paso con nombre (text-name, text-figure, text-marker, text-micro).",
+      "Do dar .tnum a toda cifra que se actualice en vivo.",
+      "Do dejar una sola acción en azul lleno por pantalla; el resto en outline o ghost.",
+      "Do apoyar la profundidad en el tono y el filete de 1px antes que en una sombra.",
+      "Do mandar las acciones raras o destructivas al menú de desbordamiento, lejos del botón que se pulsa cada minuto durante un examen.",
+      "Do enrutar cualquier confirmación destructiva por ConfirmDialog, con el foco en Cancelar.",
+      "Do leer los colores de gráficos desde las variables CSS (useChartColors), para que Recharts siga al tema."
+    ],
+    "donts": [
+      "Don't usar verde, ámbar o rojo para nada que no sea estado de alumno o de sistema.",
+      "Don't combinar color puro y tinte del mismo color (text-success sobre bg-success/10): ese es el fallo de contraste que los tokens -strong vinieron a arreglar.",
+      "Don't subir el cuerpo base por encima de 0.875rem ni bajar la densidad de las tablas: la clase entera tiene que caber en una pantalla.",
+      "Don't escribir un tamaño literal (text-[1.0625rem], text-[11px]). Si falta un escalón, se añade al fontSize del tema y se le pone nombre.",
+      "Don't usar una tarjeta para agrupar una sección de una vista de ajustes, de analíticas o de lectura. El filete de SectionTitle ya lo hace, y sin anidar cajas.",
+      "Don't centrar una columna de contenido con mx-auto: se alinea al margen izquierdo de la página, bajo su propio título.",
+      "Don't animar transformaciones en controles (escalar, hundir, rebotar). Solo color, y en ~150ms.",
+      "Don't añadir sombra a nada que no se pueda cerrar: ni tarjetas, ni botones, ni campos, ni al hacer hover.",
+      "Don't introducir una segunda familia tipográfica ni empaquetar un webfont; el sistema resuelve contra las fuentes del sistema a propósito.",
+      "Don't usar window.alert / window.confirm: salen sin estilo, en el idioma del sistema, y se descartan por reflejo.",
+      "Don't diseñar puntos de ruptura móviles. Es una única ventana de escritorio Linux.",
+      "Don't escribir colores literales en los componentes; todo pasa por los tokens de globals.css, que es lo que hace que el tema oscuro exista."
+    ]
+  }
+}

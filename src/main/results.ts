@@ -1,0 +1,252 @@
+import { promises as fs } from 'node:fs'
+import { join } from 'node:path'
+import type {
+  CaseReport,
+  LoadedResults,
+  ResumeCase,
+  ResumeReport,
+  TeutonGroup
+} from '../shared/types'
+
+interface JsonRead {
+  value: unknown | null
+  /** Incidencia legible, o null si el fichero simplemente no existe (normal). */
+  warning: string | null
+}
+
+/**
+ * Decodifica el PRIMER valor JSON completo del texto e ignora lo que venga
+ * detrás (equivalente al `raw_decode` de Python). Teutón escribe cada informe
+ * con `File.open(f, "w")`, así que dos `teuton run` solapados sobre el mismo
+ * `var/<test>/` dejan el fichero del segundo seguido de la cola del primero:
+ * un JSON válido más basura. Sin esto, `JSON.parse` falla y el alumno entero
+ * desaparece de la matriz y de las analíticas.
+ */
+function parseFirstJsonValue(text: string): unknown | undefined {
+  const start = text.search(/[{[]/)
+  if (start < 0) return undefined
+  const open = text[start]
+  const close = open === '{' ? '}' : ']'
+  let depth = 0
+  let inString = false
+  let escaped = false
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i]
+    if (inString) {
+      if (escaped) escaped = false
+      else if (ch === '\\') escaped = true
+      else if (ch === '"') inString = false
+      continue
+    }
+    if (ch === '"') inString = true
+    else if (ch === open) depth++
+    else if (ch === close && --depth === 0) {
+      try {
+        return JSON.parse(text.slice(start, i + 1))
+      } catch {
+        return undefined
+      }
+    }
+  }
+  return undefined
+}
+
+async function readJson(path: string, label: string): Promise<JsonRead> {
+  let text: string
+  try {
+    text = await fs.readFile(path, 'utf-8')
+  } catch {
+    return { value: null, warning: null }
+  }
+  try {
+    return { value: JSON.parse(text), warning: null }
+  } catch {
+    const recovered = parseFirstJsonValue(text)
+    return recovered === undefined
+      ? { value: null, warning: `${label}: JSON ilegible, se ha ignorado` }
+      : { value: recovered, warning: `${label}: JSON con basura al final (datos recuperados)` }
+  }
+}
+
+async function dirExists(p: string): Promise<boolean> {
+  try {
+    const s = await fs.stat(p)
+    return s.isDirectory()
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Localiza el directorio de salida del test. Por defecto es var/<testName>,
+ * pero si no se pasa testName buscamos el subdirectorio de var/ con resume.json
+ * más reciente (robusto ante tt_testname/tt_outdir personalizados).
+ */
+async function findOutputDir(dir: string, testName?: string): Promise<string | null> {
+  const base = join(dir, 'var')
+  if (testName) {
+    const candidate = join(base, testName)
+    if (await dirExists(candidate)) return candidate
+  }
+  if (!(await dirExists(base))) return null
+  let best: { path: string; mtime: number } | null = null
+  const entries = await fs.readdir(base, { withFileTypes: true })
+  for (const e of entries) {
+    if (!e.isDirectory()) continue
+    const resume = join(base, e.name, 'resume.json')
+    try {
+      const s = await fs.stat(resume)
+      if (!best || s.mtimeMs > best.mtime) {
+        best = { path: join(base, e.name), mtime: s.mtimeMs }
+      }
+    } catch {
+      // sin resume.json → se ignora
+    }
+  }
+  return best?.path ?? null
+}
+
+function num(v: unknown, fallback = 0): number {
+  const n = typeof v === 'number' ? v : parseFloat(String(v))
+  return Number.isFinite(n) ? n : fallback
+}
+
+function str(v: unknown, fallback = ''): string {
+  return v === null || v === undefined ? fallback : String(v)
+}
+
+function normalizeGroups(raw: unknown): TeutonGroup[] {
+  if (!Array.isArray(raw)) return []
+  return raw.map((g) => {
+    const group = g as Record<string, unknown>
+    const targets = Array.isArray(group.targets) ? group.targets : []
+    return {
+      title: str(group.title, 'Grupo'),
+      targets: targets.map((t) => {
+        const target = t as Record<string, unknown>
+        return {
+          target_id: str(target.target_id),
+          check: Boolean(target.check),
+          score: num(target.score),
+          weight: num(target.weight),
+          description: str(target.description),
+          conn_type: str(target.conn_type) || undefined,
+          duration: (target.duration as string | number) ?? undefined,
+          command: str(target.command) || undefined,
+          output: str(target.output) || undefined,
+          alterations: str(target.alterations) || undefined,
+          expected: str(target.expected) || undefined,
+          result: str(target.result) || undefined
+        }
+      })
+    }
+  })
+}
+
+function parseCaseReport(fileName: string, raw: unknown): CaseReport | null {
+  if (!raw || typeof raw !== 'object') return null
+  const data = raw as Record<string, unknown>
+  const config = (data.config as Record<string, unknown>) || {}
+  const results = (data.results as Record<string, unknown>) || {}
+  const caseId = (fileName.match(/case-(\w+)\.json/)?.[1] ?? fileName).replace(/\.json$/, '')
+  return {
+    caseId,
+    config,
+    groups: normalizeGroups(data.groups),
+    results,
+    grade: num(results.grade),
+    members: str(config.tt_members, 'anónimo'),
+    raw
+  }
+}
+
+function parseResume(raw: unknown): ResumeReport | null {
+  if (!raw || typeof raw !== 'object') return null
+  const data = raw as Record<string, unknown>
+  const casesRaw = Array.isArray(data.cases) ? data.cases : []
+  const cases: ResumeCase[] = casesRaw.map((c) => {
+    const line = c as Record<string, unknown>
+    const conn = (line.conn_status as Record<string, string>) || {}
+    return {
+      id: str(line.id, '-'),
+      members: str(line.members, 'anónimo'),
+      grade: num(line.grade),
+      state: str(line.letter, '?'),
+      moodleId: str(line.moodle_id) || undefined,
+      skip: Boolean(line.skip),
+      connErrors: conn && typeof conn === 'object' ? conn : {}
+    }
+  })
+  return {
+    config: (data.config as Record<string, unknown>) || {},
+    cases,
+    results: (data.results as Record<string, unknown>) || {}
+  }
+}
+
+export async function loadResults(dir: string, testName?: string): Promise<LoadedResults> {
+  const outputDir = await findOutputDir(dir, testName)
+  if (!outputDir) {
+    return {
+      testName: testName || '',
+      outputDir: join(dir, 'var'),
+      resume: null,
+      cases: [],
+      moodleCsv: null,
+      generatedAt: null,
+      warnings: []
+    }
+  }
+
+  const warnings: string[] = []
+  const resumeRead = await readJson(join(outputDir, 'resume.json'), 'resume.json')
+  if (resumeRead.warning) warnings.push(resumeRead.warning)
+  const resume = parseResume(resumeRead.value)
+
+  const entries = await fs.readdir(outputDir)
+  let caseFiles = entries.filter((f) => /^case-\w+\.json$/.test(f)).sort()
+  // Teutón sobrescribe los case-NN de la ejecución actual pero NO borra los de
+  // ejecuciones anteriores con más casos (p.ej. al pasar de 4 alumnos a 1 tras
+  // importar otra clase). Filtramos por los casos que declara el resume actual
+  // para no mezclar alumnos de distintas clases/ejecuciones.
+  if (resume && resume.cases.length > 0) {
+    const validIds = new Set(resume.cases.map((c) => c.id))
+    caseFiles = caseFiles.filter((f) => {
+      const id = f.match(/^case-(\w+)\.json$/)?.[1]
+      return id !== undefined && validIds.has(id)
+    })
+  }
+  const cases: CaseReport[] = []
+  for (const f of caseFiles) {
+    const read = await readJson(join(outputDir, f), f)
+    if (read.warning) warnings.push(read.warning)
+    const parsed = parseCaseReport(f, read.value)
+    if (parsed) cases.push(parsed)
+    else if (!read.warning) warnings.push(`${f}: contenido inesperado, se ha ignorado`)
+  }
+
+  let moodleCsv: string | null = null
+  try {
+    moodleCsv = await fs.readFile(join(outputDir, 'moodle.csv'), 'utf-8')
+  } catch {
+    moodleCsv = null
+  }
+
+  let generatedAt: number | null = null
+  try {
+    const s = await fs.stat(join(outputDir, 'resume.json'))
+    generatedAt = s.mtimeMs
+  } catch {
+    generatedAt = null
+  }
+
+  return {
+    testName: outputDir.split('/').pop() || testName || '',
+    outputDir,
+    resume,
+    cases,
+    moodleCsv,
+    generatedAt,
+    warnings
+  }
+}

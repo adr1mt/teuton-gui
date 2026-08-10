@@ -1,0 +1,11 @@
+node_modules/
+out/
+dist/
+*.log
+.DS_Store
+var/
+*.tsbuildinfo
+
+# Proyectos de prueba locales del profesor (no forman parte de la GUI)
+sandbox/
+.teuton-gui-records.json

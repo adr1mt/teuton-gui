@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- La CSP se aplica como cabecera HTTP desde el proceso main (ver src/main/index.ts),
+         no como <meta>, porque en desarrollo hace falta relajarla (script-src 'unsafe-inline')
+         para el preámbulo inline de @vitejs/plugin-react, y eso solo puede decidirse en main. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Teutón GUI</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
