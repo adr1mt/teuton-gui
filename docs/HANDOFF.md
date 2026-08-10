@@ -1,69 +1,82 @@
 # Handoff — estado del proyecto
 
-Última actualización: **2026-08-09**. Rama `main`.
+Última actualización: **2026-08-10**. Rama `main`. Versión **1.0.0**.
 
 ## Dónde estamos
 
 La app está completa de punta a punta: preparar el proyecto, importar la clase,
-ejecutar el examen, ver los resultados en vivo y exportar a Moodle. El trabajo de los
-últimos días no ha sido añadir funciones, sino **afinar cómo se lee la pantalla** —
-sobre todo la de Resultados, que es la que se proyecta en clase.
+ejecutar el examen, ver los resultados en vivo y exportar a Moodle. Ya no es un
+proyecto en curso: hoy se ha publicado como **1.0.0**, con instalador y con el
+repositorio empezado de cero.
 
 `npm run typecheck` y `npm test` (70 tests) pasan.
 
-## Lo último que se ha tocado
+## Cómo se abre la app (importante)
 
-**Resultados · vista Matriz.** La fila del final ya no muestra los puntos crudos de
-Teutón (0-100) sino la **nota en la escala del profesor** (con `passScore = 70`,
-70 puntos → 5,00), en verde o rojo según apruebe. Los puntos siguen accesibles pasando
-el ratón por encima. Antes convivían dos escalas en la misma pantalla: el resumen de
-arriba y la vista Lista daban la nota sobre 10, y la matriz daba puntos.
+Desde el **menú de aplicaciones**, buscando «Teutón GUI». Esa entrada no ejecuta el
+código del repositorio: ejecuta el AppImage instalado en
+`/mnt/datos/Aplicaciones/TeutonGUI/TeutonGUI.AppImage`.
 
-**Ventana estrecha.** La columna de las preguntas se encogía hasta desaparecer y su
-título se montaba encima del primer alumno. Ahora tiene un ancho mínimo (16rem) y
-aparece la barra de desplazamiento lateral.
+Por eso, **después de cualquier cambio de código hay que reinstalar**, o la app del
+menú sigue siendo la de antes:
 
-**El marcador de arriba pasa de tres bloques altos a una sola franja.** La cifra
-grande queda a la izquierda y el rótulo a su lado, en vez de apilados: de ~170px de
-alto a ~80px, sin encoger el número, que se lee desde el fondo del aula. Ese alto se
-lo queda la tabla.
+```bash
+./scripts/instalar.sh
+```
 
-**«Requieren atención» ya parece pulsable.** Lleva un embudo junto al rótulo, cursor
-de mano y subrayado al pasar por encima; el texto dice qué pasa al pulsar («Pulsa para
-ver solo estos» / «Pulsa para quitar el filtro»). Filtrar ya funcionaba, pero no había
-forma de adivinarlo.
+Compila si detecta cambios, copia el AppImage a `/mnt/datos` y actualiza la entrada del
+menú. `--forzar` recompila siempre; `--desinstalar` lo quita todo. `./launch.sh` sigue
+existiendo para pruebas rápidas desde el código, pero no es lo que se usa a diario.
 
-**Cabeceras de la matriz con el nombre de pila.** El apellido duplicaba el ancho de
-cada columna y con una clase entera obligaba a arrastrar de lado sin parar. Si dos
-alumnos comparten nombre, ambos pasan a «Marc O.» / «Marc G.»; si tampoco así se
-distinguen, se quedan con el nombre completo. El nombre entero sigue apareciendo al
-pasar el ratón y en el detalle. La lógica vive en `lib/names.ts` con sus tests.
+El ejecutable vive fuera de la carpeta personal a propósito: la partición `/` está al
+96%. Nada pesado debe ir allí.
 
-**Leyenda.** El cuadro amarillo lleva los puntos logrados en esa pregunta, no un
-símbolo fijo; el rótulo lo dice ahora («parcial (puntos logrados)»), porque un «5»
-suelto no se entendía.
+## Lo último que se ha tocado (2026-08-10)
 
-**`./launch.sh`.** Solo compilaba la primera vez, así que después de cambiar el código
-arrancaba la versión antigua sin avisar. Ahora detecta si hay cambios y recompila.
+**Release 1.0.0 publicada.** <https://github.com/adr1mt/teuton-gui/releases/tag/v1.0.0>,
+con el `.deb` y el `.AppImage` colgados. El `.deb` deja la app en el menú de cualquier
+Linux, con su icono, sin tocar nada más.
 
-**Analíticas.** Se recortó la lista de alumnos con incidencias a ocho filas, con un
-enlace que salta a Resultados con el filtro «requieren atención» ya puesto. La línea
-del aprobado se dibuja en su posición exacta, no centrada en la barra más cercana. Y se
-corrigió un parpadeo: los gráficos pintaban un instante con los colores del tema
-anterior al cambiar de claro a oscuro.
+**Historial de GitHub borrado.** Los 28 commits anteriores y la release v0.2.0 ya no
+están: el repositorio arranca en un único commit con el estado actual. No hay copia
+remota de lo anterior; sí queda el reflog local del repositorio de trabajo por si
+alguna vez hiciera falta rescatar algo.
+
+**Icono propio.** La T de Teutón sobre fondo azul con la marca de «corregido». Se
+genera con `npm run icon` (`scripts/make-icon.py`, sin dependencias: dibuja los PNG a
+mano en siete tamaños). Los PNG están commiteados, así que compilar no necesita Python.
+Si se retoca el logo, hay que volver a ejecutar ese comando y reinstalar.
+
+**`scripts/instalar.sh`**, el instalador descrito arriba. El AppImage se copia con
+nombre fijo, sin versión, para que al subir a la 1.1 la entrada del menú siga valiendo
+sin tocar nada. `--desinstalar` lee la ruta real de la línea `Exec=` de la ficha, así
+que borra el ejecutable correcto aunque esté en otro disco. Es el mismo montaje que
+usa ErasmusDocs.
+
+**Carpeta ordenada.** La raíz tenía doce ficheros sueltos. Ahora: `docs/` (este
+documento, DESIGN y PRODUCT), `build/` (los iconos de empaquetado), `scripts/` y
+`sandbox/`, que es donde viven los proyectos de prueba (`prueba/` y `examen-demo/`) y
+está fuera de git.
+
+## Antes de esto (2026-08-09)
+
+Una tanda de afinado de **Resultados**, la pantalla que se proyecta en clase: la matriz
+muestra la nota en la escala del profesor en vez de los puntos crudos de Teutón; el
+marcador de arriba pasó de tres bloques altos a una sola franja para dejarle sitio a la
+tabla; «Requieren atención» ahora parece pulsable (filtrar ya funcionaba, pero no había
+manera de adivinarlo); las cabeceras de la matriz usan el nombre de pila, desambiguado
+solo cuando hace falta (`lib/names.ts`, con tests); y la columna de preguntas tiene un
+ancho mínimo para que no desaparezca en ventana estrecha. En Analíticas, la lista de
+incidencias se recortó a ocho filas con un enlace al filtro de Resultados, y se corrigió
+un parpadeo de colores al cambiar de tema.
 
 ## Proyecto de demostración
 
-Para ver la pantalla con datos realistas sin montar máquinas virtuales:
-
-```bash
-./launch.sh
-```
-
-En Inicio, abre la carpeta `sandbox/examen-demo/` (toda `sandbox/` está fuera de git). Es un
-cuestionario de 10 preguntas de redes con 15 alumnos inventados. No usa SSH: cada
-comprobación compara en local la respuesta que el alumno lleva en su ficha. La clase
-**DEMO-15** ya está guardada en Clases y el proyecto la tiene como clase activa.
+Para ver la pantalla con datos realistas sin montar máquinas virtuales, abre en Inicio
+la carpeta `sandbox/examen-demo/`. Es un cuestionario de 10 preguntas de redes con 15
+alumnos inventados. No usa SSH: cada comprobación compara en local la respuesta que el
+alumno lleva en su ficha. La clase **DEMO-15** ya está guardada en Clases y el proyecto
+la tiene como clase activa.
 
 Las notas están repartidas a propósito para ver la pantalla en todos sus estados
 (escala del profesor, con el aprobado en 70 puntos): cuatro **10,00**, tres **8,33**,
@@ -78,21 +91,18 @@ node scripts/make-demo-project.mjs
 
 ## Pendiente
 
-La lista de mejoras de Resultados que había aquí está **cerrada**. Dos de sus puntos
-—«qué pregunta falla más gente» y «ordenar por dificultad»— se descartaron porque
-Analíticas ya los resuelve mejor: «Objetivos fallados con más frecuencia» sale ordenado
-por número de alumnos que lo fallan, con la cifra al final de cada barra. No hay que
-duplicarlo en la matriz.
+No hay ninguna funcionalidad pendiente conocida, y la lista de mejoras de Resultados
+está cerrada. Lo único que queda son dos cosas que **solo se pueden decidir mirándolas
+en clase**, con alumnos de verdad delante:
 
-Queda solo por confirmar, mirándolo en clase:
-
-- Si el ancho mínimo de la columna de preguntas (16rem) es el bueno o conviene
-  reducirlo para que quepan más alumnos a la vez.
+- Si el ancho mínimo de la columna de preguntas (16rem) es el bueno, o conviene
+  reducirlo para que quepan más alumnos a la vez en el proyector.
 - Si con una clase real de 30 el nombre de pila basta para reconocer a cada alumno de
-  un vistazo en el proyector.
+  un vistazo.
 
-No hay ninguna funcionalidad pendiente conocida. La próxima tanda de trabajo debería
-salir de usar la app en un examen de verdad, no de esta lista.
+La próxima tanda de trabajo debería salir de **usar la app en un examen de verdad**, no
+de esta lista. Cuando eso pase, lo que interesa apuntar es qué se buscó y no se
+encontró, y en qué momento hubo que mirar dos veces la pantalla.
 
 ## Documentos hermanos
 
