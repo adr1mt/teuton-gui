@@ -46,11 +46,14 @@ Descarga el paquete de la [última release](https://github.com/adr1mt/teuton-gui
 ./launch.sh        # compila si hace falta y abre la app (recomendado)
 ```
 
-Para abrirla desde el menú de aplicaciones en vez del terminal:
+Para dejarla en el **menú de aplicaciones** — compila el AppImage, lo instala en `/mnt/datos` y crea la
+entrada con su icono:
 
 ```bash
-./scripts/instalar-lanzador.sh
+./scripts/instalar.sh
 ```
+
+`--forzar` recompila aunque no detecte cambios; `--desinstalar` la quita del menú y borra el ejecutable.
 
 o en modo desarrollo con recarga en caliente:
 

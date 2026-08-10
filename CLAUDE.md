@@ -25,8 +25,19 @@ npm run build              # electron-vite build -> out/
 npm run dist:linux         # build + electron-builder (AppImage + deb) -> dist/
 ./launch.sh                 # builds if needed, kills stale instances, launches with --no-sandbox
 npm run icon               # regenerates build/icon.png + build/icons/*.png (pure-Python, no deps)
-./scripts/instalar-lanzador.sh   # installs a ~/.local .desktop entry pointing at launch.sh
+./scripts/instalar.sh      # builds the AppImage, installs it to /mnt/datos + the desktop menu
 ```
+
+**Always finish a code change by running `./scripts/instalar.sh`, and say so in the summary.** The user
+opens the app from the desktop menu, never from a terminal, so an un-reinstalled change is invisible to
+them — they'd be testing the previous build without knowing it. The menu entry
+(`~/.local/share/applications/teuton-gui.desktop`) points at
+`/mnt/datos/Aplicaciones/TeutonGUI/TeutonGUI.AppImage`, not at `launch.sh`. `launch.sh` still exists for
+quick dev runs from source, but it is not what the user launches.
+
+**Nothing large goes on `/`** — that partition is ~96% full (a few GB free). The executable lives under
+`/mnt/datos`, and any bulky file the app generates must default there too (Teutón's reports already land
+next to the teacher's project). `userData` under `~/.config/teuton-gui` is fine: it only holds small JSON.
 
 Repo layout beyond `src/`: `docs/` (DESIGN, PRODUCT, HANDOFF), `build/` (packaging icons — the
 committed PNGs come from `scripts/make-icon.py`; electron-builder derives the installed icon sizes from
