@@ -88,6 +88,21 @@ La próxima tanda de trabajo debería salir de **usar la app en un examen de ver
 de esta lista. Cuando eso pase, lo que interesa apuntar es qué se buscó y no se
 encontró, y en qué momento hubo que mirar dos veces la pantalla.
 
+## Último cambio de documentación (2026-08-16)
+
+`CLAUDE.md` se reordenó sin perder nada. Las tres reglas que hay que cumplir al
+terminar un cambio (typecheck+tests, `./scripts/instalar.sh`, actualizar este
+handoff) estaban enterradas dentro de la sección de comandos, donde se leían como
+comentarios de un bloque de shell; ahora son la sección **«Finish every change with
+these three»**, justo detrás del principio rector.
+
+Los nueve mecanismos no evidentes siguen íntegros y ahora los precede una tabla de
+enrutado («si tocas X, lee Y»), para no depender de que alguien lea 240 líneas
+enteras antes de tocar `lib/run.ts`.
+
+Queda escrito algo que no lo estaba: en este repo **los comentarios van en español**,
+al revés que en el resto de proyectos. Se documenta el hecho, no se cambia el código.
+
 ## Documentos hermanos
 
 - `CLAUDE.md` — cómo está construido y qué **no** se debe tocar sin entender por qué.

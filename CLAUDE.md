@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code working in this repository.
 
 ## What this is
 
@@ -14,56 +14,65 @@ project/test editing, execution, and a live evaluation dashboard for the classro
 Teutón computes a grade or runs a check, the correct fix is almost always to shell out to `teuton` (`run`,
 `check`) and parse its output, not to hand-roll the logic in TypeScript.
 
+**The user is a teacher, not a programmer.** He opens the app from the desktop menu and judges it by what
+he sees on screen during an exam. Explain in those terms, not in code terms.
+
+## Finish every change with these three
+
+1. **`npm run typecheck && npm test`** — before considering any change done.
+2. **`./scripts/instalar.sh`**, and say so in the summary. He opens the app from the desktop menu, never
+   from a terminal, so an un-reinstalled change is invisible: he would be testing the previous build
+   without knowing it. The menu entry (`~/.local/share/applications/teuton-gui.desktop`) points at
+   `/mnt/datos/Aplicaciones/TeutonGUI/TeutonGUI.AppImage`, not at `launch.sh`.
+3. **Update `docs/HANDOFF.md`** for anything feature-level, in the *same* commit — it is the project's
+   memory between sessions (what exists, what's pending, what was decided and why). Typo fixes and trivial
+   refactors need no entry; anything that changes behaviour, the UI or a decision does.
+
+**Nothing large goes on `/`** — that partition is ~96 % full. The executable lives under `/mnt/datos`, and
+any bulky file the app generates must default there too (Teutón's reports already land next to the
+teacher's project). `userData` under `~/.config/teuton-gui` is fine: it only holds small JSON.
+
 ## Commands
 
 ```bash
-npm install              # install deps
-npm run dev               # electron-vite dev server with HMR
-npm run typecheck         # tsc --noEmit for main/preload, renderer AND tests (run before considering a change done)
+npm install                # install deps
+npm run dev                # electron-vite dev server with HMR
+npm run typecheck          # tsc --noEmit for main/preload, renderer AND tests
 npm test                   # vitest run — unit tests in tests/
 npm run build              # electron-vite build -> out/
 npm run dist:linux         # build + electron-builder (AppImage + deb) -> dist/
-./launch.sh                 # builds if needed, kills stale instances, launches with --no-sandbox
 npm run icon               # regenerates build/icon.png + build/icons/*.png (pure-Python, no deps)
+./launch.sh                # builds if needed, kills stale instances, launches with --no-sandbox
 ./scripts/instalar.sh      # builds the AppImage, installs it to /mnt/datos + the desktop menu
                            #   --forzar rebuilds unconditionally; --desinstalar removes everything
 ```
 
-**Always finish a code change by running `./scripts/instalar.sh`, and say so in the summary.** The user
-opens the app from the desktop menu, never from a terminal, so an un-reinstalled change is invisible to
-them — they'd be testing the previous build without knowing it. The menu entry
-(`~/.local/share/applications/teuton-gui.desktop`) points at
-`/mnt/datos/Aplicaciones/TeutonGUI/TeutonGUI.AppImage`, not at `launch.sh`. `launch.sh` still exists for
-quick dev runs from source, but it is not what the user launches.
+## Repo layout
 
-**Always finish a feature-level change by updating `docs/HANDOFF.md`** — it's the project's memory
-between sessions (what exists, what's pending, what was decided and why). Update it in the same commit as
-the change, not later. Typo fixes and trivial refactors don't need an entry; anything that changes
-behaviour, the UI, or a decision does.
+Beyond `src/` (see Architecture):
 
-**Nothing large goes on `/`** — that partition is ~96% full (a few GB free). The executable lives under
-`/mnt/datos`, and any bulky file the app generates must default there too (Teutón's reports already land
-next to the teacher's project). `userData` under `~/.config/teuton-gui` is fine: it only holds small JSON.
+- `docs/` — DESIGN, PRODUCT, HANDOFF (see the table at the end).
+- `build/` — packaging icons. The committed PNGs come from `scripts/make-icon.py`; electron-builder
+  derives the installed icon sizes from the `NxN.png` filenames, so **don't rename them**.
+- `sandbox/` — the teacher's local Teutón projects, gitignored. `scripts/make-demo-project.mjs` writes
+  `sandbox/examen-demo/`.
 
-Repo layout beyond `src/`: `docs/` (DESIGN, PRODUCT, HANDOFF), `build/` (packaging icons — the
-committed PNGs come from `scripts/make-icon.py`; electron-builder derives the installed icon sizes from
-the `NxN.png` filenames, so don't rename them), `sandbox/` (the teacher's local Teutón projects, gitignored;
-`scripts/make-demo-project.mjs` writes `sandbox/examen-demo/`).
+## Testing
 
 `tests/` holds Vitest unit tests (node environment, no jsdom) over the pure domain logic plus
 `main/results.ts`, which doesn't import electron. `tests/helpers.ts` has the fixture factories;
-`tests/setup.ts` only stubs `localStorage`, which `stores/app.ts` touches at module scope. Anything that
-imports `electron` or renders React is out of scope for these tests — use the two scripts below instead.
+`tests/setup.ts` only stubs `localStorage`, which `stores/app.ts` touches at module scope. **Anything that
+imports `electron` or renders React is out of scope for these tests** — use the three routes below.
 
 ```bash
 # Validates the JSON parser + analytics against REAL teuton output (requires `teuton` installed):
 npm run verify:parsing -- <path/to/a/project/already/run>
 ```
 
-`scripts/screenshot.ts` is a smoke test that boots the real app in Electron and captures a PNG — the
-standard way to visually verify a change end-to-end when there's no display driving tool available. Bundle
-it the same way with esbuild (`--external:electron`) and run with `node_modules/electron/dist/electron
-/tmp/out.mjs --no-sandbox` under a real `DISPLAY`.
+`scripts/screenshot.ts` boots the real app in Electron and captures a PNG — the standard way to visually
+verify a change end-to-end when no display-driving tool is available. Bundle it the same way with esbuild
+(`--external:electron`) and run with `node_modules/electron/dist/electron /tmp/out.mjs --no-sandbox` under
+a real `DISPLAY`.
 
 To unit-exercise `main/store.ts` (records/CSV logic) outside Electron, bundle a throwaway script with
 `--alias:electron=<stub>.ts` where the stub exports `app = { getPath: () => '/tmp' }` — plain `node` can
@@ -83,17 +92,34 @@ Three-process Electron layout under `src/`:
   Analytics, Classes, Settings), `stores/app.ts` is a single Zustand store holding all cross-view state,
   `lib/` holds the domain logic (see below), `components/ui/` is a small local shadcn-style primitive set.
 - `src/shared/` — `types.ts` (the `TeutonApi` interface — the full IPC contract), `ipc.ts` (channel name
-  constants), and small process-agnostic helpers like `sanitize.ts` (`sanitizeFileName`). Both main and
-  renderer import from here; when adding an IPC call, update both files plus the handler in `main/ipc.ts`
-  and the binding in `preload/index.ts`. **The `IPC` map's property name doesn't have to match the exposed
-  `window.teuton` method name** — `runStart` is exposed as `run()`, `runCancel` as `cancelRun()` — so don't
-  "fix" that naming difference; it's intentional for API ergonomics. If you add a helper that needs to run
-  identically on both sides of the process boundary (main can't import from `renderer/` or vice versa),
-  put it in `src/shared/` rather than duplicating it — that's what happened with the filename sanitizer
-  used by both `main/store.ts` (Moodle CSV paths) and `Dashboard.tsx` (save-dialog default name) before it
-  moved here.
+  constants), and small process-agnostic helpers like `sanitize.ts` (`sanitizeFileName`).
 
-### Non-obvious mechanisms worth knowing before touching them
+Two rules for `src/shared/`:
+
+- **Adding an IPC call means four files**: `shared/types.ts`, `shared/ipc.ts`, the handler in
+  `main/ipc.ts` and the binding in `preload/index.ts`.
+- **The `IPC` map's property name doesn't have to match the exposed `window.teuton` method name** —
+  `runStart` is exposed as `run()`, `runCancel` as `cancelRun()`. Don't "fix" that difference; it is
+  intentional for API ergonomics.
+- A helper that must run identically on both sides of the process boundary goes in `src/shared/`, not
+  duplicated (main can't import from `renderer/` or vice versa). That is what happened with the filename
+  sanitizer used by both `main/store.ts` (Moodle CSV paths) and `Dashboard.tsx` (save-dialog default name).
+
+## Non-obvious mechanisms worth knowing before touching them
+
+Each of these has a bug behind it. Read the one that covers what you are about to change.
+
+| If you touch… | Read |
+|---|---|
+| `config.yaml` parsing or the visual config table | Config file colon-symbol format |
+| the Run tab, «modo examen», cancelling a run | Background execution & the monitor loop |
+| the progress bar or stdout parsing | Live progress bar |
+| grades, passing thresholds, KPIs | Grading conversion |
+| Settings, shared credentials, class import | App-level default globals |
+| Moodle export, grade history, «Reiniciar historial» | Best-grade record / Per-class Moodle CSVs |
+| the editor, drafts, launching a run | Draft-vs-disk consistency |
+| the dashboard matrix, analytics, report loading | Corrupt `case-NN.json` |
+| invoking the `teuton` binary | PATH discovery |
 
 **Config file colon-symbol format** (`lib/config.ts`). Teutón's config YAML is read by Ruby's `YAML.load`,
 which accepts both `tt_members: x` and the legacy Ruby-symbol style `:tt_members: x` (keys/values prefixed
@@ -129,7 +155,7 @@ configurable piecewise-linear mapping — `(0,0)`, `(passScore, maxGrade/2)`, `(
 teacher's "70 points = passing (5/10)" convention is representable. This conversion is purely a display/
 export concern; `main/store.ts` and the JSON parser always operate on Teutón's raw 0–100 score. The same
 configurable threshold drives every "passed" computation (`isPass`, `computeKpis`,
-`studentsNeedingAttention`) — never hardcode 50.
+`studentsNeedingAttention`) — **never hardcode 50**.
 
 **App-level default globals** (`get/setDefaultGlobals` in `main/store.ts`, `default-globals.json` in
 `userData`). Credentials that repeat across every class (typically the students' machine login,
@@ -186,10 +212,29 @@ excludes Ruby gem bin directories. `teutonEnv()` resolves a login shell's `PATH`
 scans `~/.local/share/gem/ruby/*/bin` and `~/.gem/ruby/*/bin`, so `teuton` is found even if the user never
 added it to their shell profile.
 
-### Security posture
+## Security posture
 
 `contextIsolation: true`, `nodeIntegration: false`, a restrictive CSP (no `unsafe-eval`; Monaco runs fine
 without it), `will-navigate`/`setWindowOpenHandler` block in-app navigation to anything outside the loaded
 renderer, and `shell.openExternal` is only reachable through the `openExternal` IPC channel which
 allow-lists `https?:`/`mailto:` schemes. CLI invocations always use `spawn`/`execFile` with an args array
 (never a shell string), so config values (student names, IPs, etc.) can't inject shell commands.
+
+**Exam data is real student data.** Names, grades and machine credentials pass through the app. Don't add
+telemetry, don't log config values, and keep anything bulky or personal out of `/`.
+
+## Conventions
+
+- **Spanish** with the user, in the app's UI **and in code comments** — that is this repo's style, unlike
+  the global default. **English** for identifiers, commit messages (conventional commits) and this file.
+- Comments explain *why*, not *what*. The mechanisms above exist because someone paid for them.
+- Don't hand-roll what the Teutón CLI already answers (see the core principle).
+
+## Other documents
+
+| File | Holds |
+|---|---|
+| `docs/HANDOFF.md` | **State**: what exists, what's pending, what was decided. Update it with every feature change. |
+| `docs/DESIGN.md` | UI/UX decisions and the visual system |
+| `docs/PRODUCT.md` | What the app is for, and for whom |
+| `README.md` | Install and first run, for anyone who is not Claude |
