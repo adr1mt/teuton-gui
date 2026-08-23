@@ -10,7 +10,7 @@
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
-    --primary: 217 91% 55%;
+    --primary: 217 91% 52%;
     --primary-foreground: 0 0% 100%;
     --secondary: 220 14% 96%;
     --secondary-foreground: 222 47% 11%;
@@ -36,7 +36,7 @@
     --destructive-strong: 0 74% 38%;
     --border: 220 13% 91%;
     --input: 220 13% 88%;
-    --ring: 217 91% 55%;
+    --ring: 217 91% 52%;
     --sidebar: 222 47% 11%;
     --sidebar-foreground: 220 14% 90%;
     /* Consola del CLI: siempre oscura en los dos temas (es una terminal), pero
@@ -98,6 +98,17 @@
     font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
     overflow: hidden;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      scroll-behavior: auto !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 
   /* Cifras del marcador: mismo ancho por dígito y sin la «1» estrecha. Un número

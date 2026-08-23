@@ -78,6 +78,8 @@ interface AppState {
    * aterrizar en Resultados ya filtrado, no en la clase entera.
    */
   attentionOnly: boolean
+  /** Último fallo operativo que requiere atención del usuario. */
+  operationalError: string | null
 
   setTheme: (theme: Theme) => void
   toggleTheme: () => void
@@ -101,9 +103,10 @@ interface AppState {
   setMonitor: (patch: Partial<MonitorState>) => void
   setActiveClass: (name: string | null, id?: string | null) => void
   setAttentionOnly: (v: boolean) => void
+  setOperationalError: (message: string | null) => void
 }
 
-const savedTheme = (localStorage.getItem('teuton-theme') as Theme) || 'dark'
+const savedTheme: Theme = localStorage.getItem('teuton-theme') === 'light' ? 'light' : 'dark'
 
 /**
  * La clase `dark` se escribe aquí, junto al cambio de estado, y no en un efecto
@@ -145,6 +148,7 @@ export const useApp = create<AppState>((set, get) => ({
   activeClass: null,
   activeClassId: null,
   attentionOnly: false,
+  operationalError: null,
 
   setTheme: (theme) => {
     localStorage.setItem('teuton-theme', theme)
@@ -171,7 +175,8 @@ export const useApp = create<AppState>((set, get) => ({
       monitor: { active: false, intervalMin: get().monitor.intervalMin, nextRunAt: null, cycles: 0 },
       activeClass: null,
       activeClassId: null,
-      attentionOnly: false
+      attentionOnly: false,
+      operationalError: null
     }),
   closeProject: () =>
     set({
@@ -186,6 +191,7 @@ export const useApp = create<AppState>((set, get) => ({
       activeClass: null,
       activeClassId: null,
       attentionOnly: false,
+      operationalError: null,
       view: 'home'
     }),
   setScriptDraft: (v) => set({ scriptDraft: v, dirty: true }),
@@ -231,5 +237,6 @@ export const useApp = create<AppState>((set, get) => ({
   resetRun: () => set({ run: { ...IDLE_RUN } }),
   setMonitor: (patch) => set((s) => ({ monitor: { ...s.monitor, ...patch } })),
   setActiveClass: (activeClass, activeClassId = null) => set({ activeClass, activeClassId }),
-  setAttentionOnly: (attentionOnly) => set({ attentionOnly })
+  setAttentionOnly: (attentionOnly) => set({ attentionOnly }),
+  setOperationalError: (operationalError) => set({ operationalError })
 }))

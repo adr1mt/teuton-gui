@@ -17,6 +17,7 @@ app.commandLine.appendSwitch('disable-gpu-compositing')
  */
 function registerCsp(): void {
   const scriptSrc = app.isPackaged ? "script-src 'self' blob:" : "script-src 'self' blob: 'unsafe-inline'"
+  const connectSrc = app.isPackaged ? "connect-src 'self'" : "connect-src 'self' ws: wss:"
   const csp = [
     "default-src 'self'",
     scriptSrc,
@@ -24,7 +25,7 @@ function registerCsp(): void {
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self' data:",
     "img-src 'self' data: blob:",
-    "connect-src 'self' ws: wss:"
+    connectSrc
   ].join('; ')
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
@@ -55,8 +56,8 @@ function createWindow(): void {
     autoHideMenuBar: true,
     title: 'Teutón GUI',
     webPreferences: {
-      preload: join(__dirname, '../preload/index.mjs'),
-      sandbox: false,
+      preload: join(__dirname, '../preload/index.cjs'),
+      sandbox: true,
       contextIsolation: true,
       nodeIntegration: false
     }

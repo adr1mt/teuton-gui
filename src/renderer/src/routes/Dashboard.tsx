@@ -54,6 +54,7 @@ import { reloadLatestResults, caseIndexFor, reevaluateStudent } from '../lib/run
 import { sanitizeFileName } from '../../../shared/sanitize'
 import StudentDetail from '../components/StudentDetail'
 import { MonitorBanner } from '../components/Monitor'
+import { validateResultIdentity } from '../lib/integrity'
 
 type ViewMode = 'list' | 'matrix'
 type Grading = { passScore: number; maxGrade: number }
@@ -106,6 +107,10 @@ export default function Dashboard() {
     () => studentsNeedingAttention(rows, grading.passScore),
     [rows, grading.passScore]
   )
+  const identityIssues = useMemo(
+    () => (results ? validateResultIdentity(results) : []),
+    [results]
+  )
 
   const visible = useMemo(() => {
     const needle = filter.trim().toLowerCase()
@@ -122,6 +127,10 @@ export default function Dashboard() {
     )
     return rows.some((r) => !current.has(r.members))
   }, [rows, configDraft])
+  const resultClassId = results?.classId === undefined ? activeClassId : results.classId
+  const resultClassName = results?.className === undefined ? activeClass : results.className
+  const classMismatch = results?.classId !== undefined && results.classId !== activeClassId
+  const exportBlocked = staleResults || classMismatch || identityIssues.length > 0
 
   const selectStudent = useCallback((r: StudentRow) => setSelectedId(r.id), [])
 
@@ -134,35 +143,56 @@ export default function Dashboard() {
   async function doResetRecords() {
     setConfirmReset(false)
     if (!project) return
-    await window.teuton.resetRecords(project.dir, activeClassId ?? undefined)
-    setRecords({})
+    try {
+      const outcome = await window.teuton.resetRecords(project.dir, resultClassId ?? undefined)
+      setRecords(outcome.data)
+      if (!outcome.persisted) useApp.getState().setOperationalError(outcome.warning || 'No se pudo guardar el reinicio del historial.')
+    } catch (cause) {
+      useApp.getState().setOperationalError(`No se pudo reiniciar el historial: ${cause instanceof Error ? cause.message : String(cause)}`)
+    }
   }
 
   async function doExportMoodle() {
     setConfirmExport(false)
     if (!results) return
+    if (exportBlocked) {
+      useApp.getState().setOperationalError('La exportación está bloqueada hasta corregir la identidad de los alumnos o volver a ejecutar la clase activa.')
+      return
+    }
     // Usa SIEMPRE la mejor nota (récord): si un alumno acabó, sacó un 10 y apagó
     // la máquina, no debe quedarle un 0. El nombre del fichero lleva la clase
     // activa para que los CSV de distintos grupos coexistan.
-    const csv = buildMoodleCsv(results, records, grading)
-    const name = activeClass || results.testName || 'teuton'
-    const safe = sanitizeFileName(name, 'teuton')
-    const saved = await window.teuton.saveFileDialog(`moodle-${safe}.csv`, csv)
-    if (saved) {
-      setNotice(`${t.dashboard.exported} · ${rows.length} ${t.dashboard.exportedDetail}`)
-      window.setTimeout(() => setNotice(null), 6000)
+    try {
+      const csv = buildMoodleCsv(results, records, grading)
+      const name = resultClassName || results.testName || 'teuton'
+      const safe = sanitizeFileName(name, 'teuton')
+      const saved = await window.teuton.saveFileDialog(`moodle-${safe}.csv`, csv)
+      if (saved) {
+        setNotice(`${t.dashboard.exported} · ${rows.length} ${t.dashboard.exportedDetail}`)
+        window.setTimeout(() => setNotice(null), 6000)
+      }
+    } catch (cause) {
+      useApp.getState().setOperationalError(`No se pudo exportar el CSV: ${cause instanceof Error ? cause.message : String(cause)}`)
     }
   }
 
   function exportMoodle() {
     // Un CSV mal exportado acaba en el expediente del alumno: si sabemos que los
     // datos no cuadran, se avisa antes de escribirlo.
-    if (staleResults || (results && results.warnings.length > 0)) setConfirmExport(true)
+    if (exportBlocked) {
+      useApp.getState().setOperationalError('No se puede exportar: los resultados no corresponden inequívocamente a la clase activa.')
+    } else if (results && results.warnings.length > 0) setConfirmExport(true)
     else void doExportMoodle()
   }
 
   function openOutputFolder() {
-    if (results?.outputDir) window.teuton.openPath(results.outputDir)
+    if (results?.outputDir) {
+      void window.teuton.openPath(results.outputDir).then((message) => {
+        if (message) useApp.getState().setOperationalError(`No se pudo abrir la carpeta: ${message}`)
+      }).catch((cause) => {
+        useApp.getState().setOperationalError(`No se pudo abrir la carpeta: ${cause instanceof Error ? cause.message : String(cause)}`)
+      })
+    }
   }
 
   // Solo mostramos el spinner a pantalla completa en la carga inicial, no en cada
@@ -221,8 +251,8 @@ export default function Dashboard() {
         title={t.dashboard.title}
         meta={
           <>
-            {activeClass && (
-              <MetaChip icon={<GraduationCap className="h-3.5 w-3.5" />}>{activeClass}</MetaChip>
+            {resultClassName && (
+              <MetaChip icon={<GraduationCap className="h-3.5 w-3.5" />}>{resultClassName}</MetaChip>
             )}
             <span className="tnum text-xs text-muted-foreground">
               {rows.length} {rows.length === 1 ? t.dashboard.student : t.dashboard.students}
@@ -244,6 +274,7 @@ export default function Dashboard() {
             <div className="relative w-44">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
+                aria-label={t.dashboard.filter}
                 placeholder={t.dashboard.filter}
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
@@ -296,7 +327,7 @@ export default function Dashboard() {
             >
               <RefreshCw className="h-4 w-4" />
             </Button>
-            <Button size="sm" onClick={exportMoodle}>
+            <Button size="sm" onClick={exportMoodle} aria-disabled={exportBlocked} title={exportBlocked ? 'Corrige los avisos antes de exportar' : undefined}>
               <Download className="h-4 w-4" /> {t.dashboard.exportMoodle}
             </Button>
             {/* Carpeta y, sobre todo, «Reiniciar historial» salen de la barra: un
@@ -374,6 +405,19 @@ export default function Dashboard() {
           </Banner>
         )}
         {results.warnings.length > 0 && <WarningsBanner warnings={results.warnings} />}
+        {identityIssues.length > 0 && (
+          <Banner tone="warning" icon={<AlertTriangle className="h-4 w-4 shrink-0" />}>
+            <strong>Exportación bloqueada.</strong>
+            <ul className="mt-1 list-disc pl-4">
+              {identityIssues.map((issue) => <li key={`${issue.kind}-${issue.message}`}>{issue.message}</li>)}
+            </ul>
+          </Banner>
+        )}
+        {classMismatch && (
+          <Banner tone="warning" icon={<AlertTriangle className="h-4 w-4 shrink-0" />}>
+            Estos resultados pertenecen a «{resultClassName || 'ejecución manual'}», no a la clase activa. Vuelve a ejecutar antes de exportar.
+          </Banner>
+        )}
         {staleResults && (
           <Banner tone="warning" icon={<AlertTriangle className="h-4 w-4 shrink-0" />}>
             {t.run.staleResults} {t.dashboard.staleHint}
@@ -419,8 +463,8 @@ export default function Dashboard() {
         onCancel={() => setConfirmReset(false)}
       >
         <p>
-          {activeClass
-            ? `${t.dashboard.resetScopeClass} «${activeClass}»`
+          {resultClassName
+            ? `${t.dashboard.resetScopeClass} «${resultClassName}»`
             : t.dashboard.resetScopeManual}
           {': '}
           <strong className="text-foreground">
@@ -438,7 +482,6 @@ export default function Dashboard() {
         onConfirm={() => void doExportMoodle()}
         onCancel={() => setConfirmExport(false)}
       >
-        {staleResults && <p>{t.dashboard.exportWarnStale}</p>}
         {results.warnings.length > 0 && <p>{t.dashboard.exportWarnReports}</p>}
       </ConfirmDialog>
     </div>

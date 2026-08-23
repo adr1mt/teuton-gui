@@ -1,6 +1,6 @@
 # Handoff — estado del proyecto
 
-Última actualización: **2026-08-10**. Rama `main`. Versión **1.0.0**.
+Última actualización: **2026-08-23**. Rama `main`. Versión **1.0.0**.
 
 ## Dónde estamos
 
@@ -9,13 +9,54 @@ ejecutar el examen, ver los resultados en vivo y exportar a Moodle. Ya no es un
 proyecto en curso: hoy se ha publicado como **1.0.0**, con instalador y con el
 repositorio empezado de cero.
 
-`npm run typecheck` y `npm test` (70 tests) pasan.
+`npm run typecheck` y `npm test` (81 tests) pasan. La compilación de producción se
+verifica también en CI.
 
 Este documento cuenta **el estado**: dónde estamos, qué se decidió y qué queda. Las
 reglas de trabajo (reinstalar tras cada cambio, dónde van los ficheros pesados, qué no
 tocar) viven en `CLAUDE.md` y no se repiten aquí.
 
-## Lo último que se ha tocado (2026-08-10)
+## Lo último que se ha tocado (2026-08-23)
+
+**Tanda de integridad y robustez previa a examen.** Los resultados viajan con el ID y
+el nombre congelados de la clase que los produjo. Cambiar de clase limpia el dashboard
+y una discrepancia de clase, nombre duplicado o ID Moodle vacío/duplicado bloquea la
+exportación. Los récords no se actualizan con identidades ambiguas y todo fallo al
+guardar récords, metadatos o CSV aparece en una franja persistente.
+
+**Fronteras endurecidas.** Todos los IPC comprueban origen, forma, límites, rutas y
+nombres. El `runId` se crea en el renderer antes de arrancar el hijo, con lo que no se
+pierde el primer evento; errores, cancelación y fallos de inicio vuelven a programar el
+modo examen. El parser distingue `ENOENT` de errores reales y tolera objetos anidados
+malformados sin ocultarlos. Producción usa sandbox y una CSP sin WebSockets externos.
+
+**Interfaz y mantenimiento.** Escala y credenciales se editan como borrador y se
+guardan explícitamente; se completaron etiquetas accesibles, foco de diálogos, teclado
+de menús y movimiento reducido. El azul claro pasa a L52 para alcanzar AA y las
+cabeceras crecen de forma segura a 960px. Las rutas cargan de forma diferida, hay Error
+Boundary y error operacional global, CI en GitHub Actions y el instalador admite
+destinos con espacios.
+
+La auditoría online queda en **0 vulnerabilidades** tras actualizar `js-yaml` 4.3,
+Electron 43, electron-builder 26, electron-vite 5 y Vite 7. La CI usa Node 22, que es
+el runtime mínimo soportado por esa versión de Electron.
+
+La suite añade regresiones de validación, identidad, parser, carrera de ejecución,
+reprogramación del monitor, persistencia degradada y migración del historial.
+
+La revisión previa a publicar corrigió también una actualización parcial de metadatos
+que podía borrar la clase activa al guardar qué grupo produjo la última ejecución. La
+regla de nombres e IDs Moodle repetidos vive ahora en `shared/` para ser idéntica en la
+interfaz y en la frontera IPC, con una regresión que cubre ambas decisiones.
+
+**Corrección del arranque instalado.** El AppImage quedaba en blanco porque el preload
+se generaba como ESM, un formato que Electron no admite cuando el renderer conserva el
+sandbox. Ahora se empaqueta como CommonJS, sin desactivar ninguna protección. Cada
+`npm run build` verifica además el formato y la ruta del preload para impedir que una
+versión incompatible llegue de nuevo al instalador. La versión instalada se comprobó
+tanto por sus errores de consola como capturando la ventana ya cargada.
+
+## Release 1.0.0 (2026-08-10)
 
 **Release 1.0.0 publicada.** <https://github.com/adr1mt/teuton-gui/releases/tag/v1.0.0>,
 con el `.deb` y el `.AppImage` colgados. El `.deb` deja la app en el menú de cualquier

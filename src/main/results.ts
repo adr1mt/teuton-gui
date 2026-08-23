@@ -1,5 +1,5 @@
 import { promises as fs } from 'node:fs'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import type {
   CaseReport,
   LoadedResults,
@@ -55,8 +55,10 @@ async function readJson(path: string, label: string): Promise<JsonRead> {
   let text: string
   try {
     text = await fs.readFile(path, 'utf-8')
-  } catch {
-    return { value: null, warning: null }
+  } catch (error) {
+    if (isMissing(error)) return { value: null, warning: null }
+    const detail = error instanceof Error ? error.message : String(error)
+    return { value: null, warning: `${label}: no se pudo leer (${detail})` }
   }
   try {
     return { value: JSON.parse(text), warning: null }
@@ -72,9 +74,20 @@ async function dirExists(p: string): Promise<boolean> {
   try {
     const s = await fs.stat(p)
     return s.isDirectory()
-  } catch {
-    return false
+  } catch (error) {
+    if (isMissing(error)) return false
+    throw error
   }
+}
+
+function isMissing(error: unknown): boolean {
+  return !!error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT'
+}
+
+function record(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null
 }
 
 /**
@@ -99,7 +112,8 @@ async function findOutputDir(dir: string, testName?: string): Promise<string | n
       if (!best || s.mtimeMs > best.mtime) {
         best = { path: join(base, e.name), mtime: s.mtimeMs }
       }
-    } catch {
+    } catch (error) {
+      if (!isMissing(error)) throw error
       // sin resume.json → se ignora
     }
   }
@@ -117,14 +131,16 @@ function str(v: unknown, fallback = ''): string {
 
 function normalizeGroups(raw: unknown): TeutonGroup[] {
   if (!Array.isArray(raw)) return []
-  return raw.map((g) => {
-    const group = g as Record<string, unknown>
+  return raw.flatMap((g) => {
+    const group = record(g)
+    if (!group) return []
     const targets = Array.isArray(group.targets) ? group.targets : []
-    return {
+    return [{
       title: str(group.title, 'Grupo'),
-      targets: targets.map((t) => {
-        const target = t as Record<string, unknown>
-        return {
+      targets: targets.flatMap((t) => {
+        const target = record(t)
+        if (!target) return []
+        return [{
           target_id: str(target.target_id),
           check: Boolean(target.check),
           score: num(target.score),
@@ -137,17 +153,17 @@ function normalizeGroups(raw: unknown): TeutonGroup[] {
           alterations: str(target.alterations) || undefined,
           expected: str(target.expected) || undefined,
           result: str(target.result) || undefined
-        }
+        }]
       })
-    }
+    }]
   })
 }
 
 function parseCaseReport(fileName: string, raw: unknown): CaseReport | null {
   if (!raw || typeof raw !== 'object') return null
   const data = raw as Record<string, unknown>
-  const config = (data.config as Record<string, unknown>) || {}
-  const results = (data.results as Record<string, unknown>) || {}
+  const config = record(data.config) || {}
+  const results = record(data.results) || {}
   const caseId = (fileName.match(/case-(\w+)\.json/)?.[1] ?? fileName).replace(/\.json$/, '')
   return {
     caseId,
@@ -164,23 +180,26 @@ function parseResume(raw: unknown): ResumeReport | null {
   if (!raw || typeof raw !== 'object') return null
   const data = raw as Record<string, unknown>
   const casesRaw = Array.isArray(data.cases) ? data.cases : []
-  const cases: ResumeCase[] = casesRaw.map((c) => {
-    const line = c as Record<string, unknown>
-    const conn = (line.conn_status as Record<string, string>) || {}
-    return {
+  const cases: ResumeCase[] = casesRaw.flatMap((c) => {
+    const line = record(c)
+    if (!line) return []
+    const connRaw = record(line.conn_status) || {}
+    const conn: Record<string, string> = {}
+    for (const [key, value] of Object.entries(connRaw)) conn[key] = str(value)
+    return [{
       id: str(line.id, '-'),
       members: str(line.members, 'anónimo'),
       grade: num(line.grade),
       state: str(line.letter, '?'),
       moodleId: str(line.moodle_id) || undefined,
       skip: Boolean(line.skip),
-      connErrors: conn && typeof conn === 'object' ? conn : {}
-    }
+      connErrors: conn
+    }]
   })
   return {
-    config: (data.config as Record<string, unknown>) || {},
+    config: record(data.config) || {},
     cases,
-    results: (data.results as Record<string, unknown>) || {}
+    results: record(data.results) || {}
   }
 }
 
@@ -228,20 +247,26 @@ export async function loadResults(dir: string, testName?: string): Promise<Loade
   let moodleCsv: string | null = null
   try {
     moodleCsv = await fs.readFile(join(outputDir, 'moodle.csv'), 'utf-8')
-  } catch {
-    moodleCsv = null
+  } catch (error) {
+    if (!isMissing(error)) {
+      const detail = error instanceof Error ? error.message : String(error)
+      warnings.push(`moodle.csv: no se pudo leer (${detail})`)
+    }
   }
 
   let generatedAt: number | null = null
   try {
     const s = await fs.stat(join(outputDir, 'resume.json'))
     generatedAt = s.mtimeMs
-  } catch {
-    generatedAt = null
+  } catch (error) {
+    if (!isMissing(error)) {
+      const detail = error instanceof Error ? error.message : String(error)
+      warnings.push(`resume.json: no se pudo consultar la fecha (${detail})`)
+    }
   }
 
   return {
-    testName: outputDir.split('/').pop() || testName || '',
+    testName: basename(outputDir) || testName || '',
     outputDir,
     resume,
     cases,

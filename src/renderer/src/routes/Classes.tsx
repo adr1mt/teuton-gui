@@ -16,6 +16,7 @@ import { cn } from '../lib/utils'
 import { CLASS_COMMON_FIELDS, CLASS_FIXED_FIELD } from '../lib/fields'
 import { isSecretColumn } from '../lib/config'
 import type { ClassRoster, Student } from '../../../shared/types'
+import { validateRosterIdentity } from '../lib/integrity'
 
 function emptyClass(): ClassRoster {
   return { id: crypto.randomUUID(), name: '', students: [], createdAt: 0, updatedAt: 0 }
@@ -46,9 +47,12 @@ export default function Classes() {
   const [showPaste, setShowPaste] = useState(false)
   const [showAddField, setShowAddField] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<ClassRoster | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    window.teuton.listClasses().then(setClasses)
+    window.teuton.listClasses().then(setClasses).catch((cause) => {
+      setError(`No se pudieron cargar las clases: ${cause instanceof Error ? cause.message : String(cause)}`)
+    })
   }, [])
 
   useEffect(() => {
@@ -71,18 +75,42 @@ export default function Classes() {
 
   async function save() {
     if (!editing) return
-    if (!editing.name.trim()) {
-      editing.name = 'Clase sin nombre'
+    const normalized: ClassRoster = {
+      ...editing,
+      name: editing.name.trim(),
+      students: editing.students.map((student) => ({
+        ...student,
+        name: student.name.trim(),
+        moodleId: student.moodleId?.trim() || undefined
+      }))
     }
-    const list = await window.teuton.saveClass(editing)
-    setClasses(list)
-    setEditing(null)
+    if (!normalized.name) {
+      setError('La clase necesita un nombre.')
+      return
+    }
+    const issues = validateRosterIdentity(normalized)
+    if (issues.length > 0) {
+      setError(issues.map((issue) => issue.message).join(' '))
+      return
+    }
+    setError(null)
+    try {
+      const list = await window.teuton.saveClass(normalized)
+      setClasses(list)
+      setEditing(null)
+    } catch (cause) {
+      setError(`No se pudo guardar la clase: ${cause instanceof Error ? cause.message : String(cause)}`)
+    }
   }
 
   async function remove(id: string) {
     setPendingDelete(null)
-    setClasses(await window.teuton.deleteClass(id))
-    if (editing?.id === id) setEditing(null)
+    try {
+      setClasses(await window.teuton.deleteClass(id))
+      if (editing?.id === id) setEditing(null)
+    } catch (cause) {
+      setError(`No se pudo eliminar la clase: ${cause instanceof Error ? cause.message : String(cause)}`)
+    }
   }
 
   function patchStudent(idx: number, patch: Partial<Student>) {
@@ -167,6 +195,11 @@ export default function Classes() {
           </Button>
         }
       />
+      {error && (
+        <div role="alert" className="shrink-0 border-b border-destructive/30 bg-destructive/10 px-4 py-2 text-sm text-destructive-strong">
+          {error}
+        </div>
+      )}
       <div className="flex min-h-0 flex-1 overflow-hidden">
       {/* Lista de clases */}
       <div className="w-64 shrink-0 overflow-y-auto border-r border-border p-3">
@@ -217,6 +250,7 @@ export default function Classes() {
           <div className="max-w-4xl p-6">
             <div className="mb-2 flex items-center gap-3">
               <Input
+                aria-label={t.classes.className}
                 value={editing.name}
                 placeholder={t.classes.className}
                 onChange={(e) => setEditing({ ...editing, name: e.target.value })}
@@ -253,6 +287,7 @@ export default function Classes() {
                             {col}
                             {col !== CLASS_FIXED_FIELD && (
                               <button
+                                type="button"
                                 onClick={() => removeFieldColumn(col)}
                                 className="rounded p-0.5 text-muted-foreground/60 hover:bg-destructive/10 hover:text-destructive-strong"
                                 aria-label={`Quitar columna ${col}`}
@@ -274,6 +309,7 @@ export default function Classes() {
                         <td className="p-0">
                           <input
                             value={s.name}
+                            aria-label={`${t.classes.name} ${i + 1}`}
                             onChange={(e) => patchStudent(i, { name: e.target.value })}
                             className="w-full min-w-[120px] bg-transparent px-3 py-2 font-medium outline-none focus:bg-accent/40"
                           />
@@ -281,6 +317,7 @@ export default function Classes() {
                         <td className="p-0">
                           <input
                             value={s.moodleId ?? ''}
+                            aria-label={`${t.classes.moodleId} ${i + 1}`}
                             placeholder="—"
                             onChange={(e) => patchStudent(i, { moodleId: e.target.value })}
                             className="w-full min-w-[160px] bg-transparent px-3 py-2 font-mono text-xs outline-none focus:bg-accent/40"
@@ -293,6 +330,7 @@ export default function Classes() {
                               <input
                                 type={secret ? 'password' : 'text'}
                                 value={s.fields?.[col] ?? ''}
+                                aria-label={`${col} ${i + 1}`}
                                 placeholder={col === 'host1_ip' ? '192.168.1.10' : ''}
                                 onChange={(e) => patchStudentField(i, col, e.target.value)}
                                 className="w-full min-w-[120px] bg-transparent px-3 py-2 text-sm outline-none focus:bg-accent/40"
@@ -302,6 +340,7 @@ export default function Classes() {
                         })}
                         <td className="border-l border-border text-center">
                           <button
+                            type="button"
                             onClick={() => removeStudent(i)}
                             className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             aria-label={`Eliminar alumno ${s.name || i + 1}`}
@@ -333,16 +372,24 @@ export default function Classes() {
               {/* Fuera de la cabecera de la tabla: allí el desplegable lo
                   recortaba el contenedor con scroll horizontal. */}
               <div className="relative">
-                <Button size="sm" variant="ghost" onClick={() => setShowAddField((s) => !s)}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-haspopup="menu"
+                  aria-expanded={showAddField}
+                  onClick={() => setShowAddField((s) => !s)}
+                >
                   <Plus className="h-4 w-4" /> {t.editor.addColumn}
                   <ChevronDown className="h-3 w-3" />
                 </Button>
                 {showAddField && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setShowAddField(false)} />
-                    <div className="absolute left-0 z-20 mt-1 w-64 rounded-lg border border-border bg-popover p-1 shadow-lg">
+                    <div role="menu" className="absolute left-0 z-20 mt-1 w-64 rounded-lg border border-border bg-popover p-1 shadow-lg">
                       {CLASS_COMMON_FIELDS.filter((f) => !fCols.includes(f.key)).map((f) => (
                         <button
+                          type="button"
+                          role="menuitem"
                           key={f.key}
                           onClick={() => addFieldColumn(f.key)}
                           className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -365,6 +412,7 @@ export default function Classes() {
             {showPaste && (
               <div className="mt-3">
                 <textarea
+                  aria-label={t.classes.paste}
                   value={pasteText}
                   onChange={(e) => setPasteText(e.target.value)}
                   placeholder={t.classes.pasteHint}

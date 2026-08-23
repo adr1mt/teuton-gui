@@ -2,7 +2,7 @@
 name: Teutón GUI
 description: El marcador del aula — un panel de escritorio que se lee de un vistazo mientras corriges un examen en directo.
 colors:
-  signal-blue: "hsl(217 91% 55%)"
+  signal-blue: "hsl(217 91% 52%)"
   ink-night: "hsl(222 47% 11%)"
   classroom-white: "hsl(220 27% 98%)"
   surface-card: "hsl(0 0% 100%)"
@@ -108,7 +108,7 @@ components:
     padding: "8px 16px"
     height: "36px"
   button-primary-hover:
-    backgroundColor: "hsl(217 91% 55% / 0.9)"
+    backgroundColor: "hsl(217 91% 52% / 0.9)"
   button-outline:
     backgroundColor: "transparent"
     textColor: "{colors.ink-night}"
@@ -146,8 +146,8 @@ components:
     backgroundColor: "transparent"
     textColor: "{colors.ink-night}"
     typography: "{typography.ui}"
-    height: "56px"
-    padding: "0 24px"
+    minHeight: "56px"
+    padding: "8px 24px"
     borderBottom: "1px solid {colors.hairline}"
   scoreboard-reading:
     backgroundColor: "transparent"
@@ -172,7 +172,7 @@ components:
     borderBottom: "1px solid {colors.hairline}"
     padding: "0 0 8px"
   nav-item-active:
-    backgroundColor: "hsl(217 91% 55% / 0.2)"
+    backgroundColor: "hsl(217 91% 52% / 0.2)"
     textColor: "#ffffff"
     typography: "{typography.title}"
     rounded: "{rounded.md}"
@@ -213,7 +213,8 @@ lectura y densidad baja. Aquí se escanea, no se lee.
 **Key Characteristics:**
 
 - Marcador primero: en Resultados, tres lecturas enormes y una fila por alumno con su
-  nombre y su nota a tamaño de proyector. Los controles caben en una barra de 56px.
+  nombre y su nota a tamaño de proyector. La cabecera mide al menos 56px y crece una
+  segunda línea cuando el ancho mínimo no permite alojar todos los controles.
 - Lateral de tinta fija + lienzo claro; el contraste de zonas orienta antes que el texto.
 - Color semántico y racionado: azul = sistema, verde/ámbar/rojo = alumno.
 - Densidad de instrumento: cuerpo base de 14px y cero aire decorativo, con la escala
@@ -361,14 +362,15 @@ van de la pantalla.
 **Todas las vistas tienen el mismo esqueleto**, sin excepción:
 
 ```
-ViewHeader (56px, fija)  →  franjas de estado fijas  →  región con scroll (px-24 pt-20)
+ViewHeader (mín. 56px, fija)  →  franjas de estado fijas  →  región con scroll (px-24 pt-20)
 ```
 
 La `ViewHeader` lleva el título a la izquierda, el contexto justo detrás (clase activa,
 recuento, hora) y los controles al final. Antes había dos especificaciones —las vistas
 tranquilas titulaban a 30px con margen de página y las de operación a 18px dentro de
 una barra—, de modo que el escalón grande le tocaba justo a la vista que menos lo
-necesita.
+necesita. En 960px permite dos líneas y aumenta su altura; nunca recorta ni superpone
+las acciones.
 
 Ventana única de escritorio: **el sistema no es responsive por diseño**. Los pocos
 saltos que quedan (`xl:` en el listado de alumnos, `lg:` en la rejilla de analíticas)
@@ -486,8 +488,9 @@ guardar en el editor), spinner azul (ejecución en curso).
 Tres primitivas cubren el 90% del cromo, y son la razón de que dos vistas cualesquiera
 se parezcan:
 
-- **`ViewHeader`** — barra fija de 56px: `h1` en `ui`, contexto detrás, acciones al
-  final. Es el único sitio donde vive el título de una vista.
+- **`ViewHeader`** — barra fija de al menos 56px: `h1` en `ui`, contexto detrás,
+  acciones al final y wrap seguro en el ancho mínimo. Es el único sitio donde vive
+  el título de una vista.
 - **`SectionTitle`** — encabezado de bloque con filete inferior y una pista opcional a
   su lado. **Sustituye a la tarjeta como contenedor de sección**: en Ajustes y
   Analíticas, lo que agrupa es la regla de 1px y el aire, no una caja.

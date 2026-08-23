@@ -119,4 +119,22 @@ describe('loadResults', () => {
     expect(res.resume).toBeNull()
     expect(res.warnings).toEqual([])
   })
+
+  it('ignora elementos anidados con forma inesperada sin lanzar', async () => {
+    dir = await makeProjectDir()
+    await writeOutput(dir, 'raro', {
+      'resume.json': JSON.stringify({ config: [], cases: [null, 7, { id: '01', members: 'Ana', grade: 75, conn_status: ['mal'] }], results: [] }),
+      'case-01.json': JSON.stringify({
+        config: { tt_members: 'Ana' },
+        groups: [null, { title: 'Grupo', targets: [null, 4, { target_id: '01', check: true }] }],
+        results: { grade: 75 }
+      })
+    })
+
+    const res = await loadResults(dir)
+    expect(res.resume?.cases).toHaveLength(1)
+    expect(res.resume?.cases[0].connErrors).toEqual({})
+    expect(res.cases[0].groups).toHaveLength(1)
+    expect(res.cases[0].groups[0].targets).toHaveLength(1)
+  })
 })

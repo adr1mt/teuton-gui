@@ -13,6 +13,7 @@ import { cn } from '../lib/utils'
 import { COMMON_FIELDS } from '../lib/fields'
 import { useApp } from '../stores/app'
 import type { ClassRoster } from '../../../shared/types'
+import { validateRosterIdentity } from '../lib/integrity'
 
 export default function ConfigTable({
   yamlText,
@@ -28,7 +29,9 @@ export default function ConfigTable({
   const [showAddField, setShowAddField] = useState(false)
 
   useEffect(() => {
-    window.teuton.listClasses().then(setClasses)
+    window.teuton.listClasses().then(setClasses).catch((cause) => {
+      useApp.getState().setOperationalError(`No se pudieron cargar las clases: ${cause instanceof Error ? cause.message : String(cause)}`)
+    })
   }, [])
 
   // Cerrar los desplegables con la tecla Escape.
@@ -89,7 +92,13 @@ export default function ConfigTable({
     emit({ ...config, global: { ...config.global, [name]: '' } })
   }
 
-  function importClass(roster: ClassRoster) {
+  async function importClass(roster: ClassRoster) {
+    const issues = validateRosterIdentity(roster)
+    if (issues.length > 0) {
+      useApp.getState().setOperationalError(issues.map((issue) => issue.message).join(' '))
+      setShowImport(false)
+      return
+    }
     // Solo conservamos los valores específicos (servicio, puerto...) al volver
     // a importar LA MISMA clase. Al cambiar de grupo partimos de sus propios
     // datos: un alumno homónimo no puede heredar IPs ni credenciales del grupo
@@ -116,14 +125,21 @@ export default function ConfigTable({
     // Moodle por clase y persiste entre sesiones.
     const st = useApp.getState()
     st.setActiveClass(roster.name, roster.id)
+    // Los resultados anteriores conservan su propia procedencia, pero dejan de
+    // ocupar el dashboard al cambiar de grupo para evitar una exportación por despiste.
+    st.setResults(null)
+    st.setRecords({})
     if (st.project) {
-      void window.teuton.setProjectMeta(st.project.dir, {
-        activeClass: roster.name,
-        activeClassId: roster.id
-      })
-      // Al cambiar de grupo también cambia el historial que se enseña. Así el
-      // dashboard nunca muestra como récord los datos de la clase anterior.
-      void window.teuton.getRecords(st.project.dir, roster.id).then(st.setRecords)
+      try {
+        await window.teuton.setProjectMeta(st.project.dir, {
+          activeClass: roster.name,
+          activeClassId: roster.id
+        })
+        // Al cambiar de grupo también cambia el historial que se enseña.
+        st.setRecords(await window.teuton.getRecords(st.project.dir, roster.id))
+      } catch (cause) {
+        st.setOperationalError(`La clase se importó en el editor, pero no se pudo guardar su contexto: ${cause instanceof Error ? cause.message : String(cause)}`)
+      }
     }
     setShowImport(false)
   }
@@ -173,6 +189,7 @@ export default function ConfigTable({
                   {key}
                 </label>
                 <Input
+                  aria-label={`Valor global ${key}`}
                   value={String(config.global[key] ?? '')}
                   onChange={(e) => updateGlobal(key, e.target.value)}
                   className="h-8"
@@ -195,12 +212,12 @@ export default function ConfigTable({
             <div className="ml-auto flex flex-wrap gap-1">
               {/* Importar clase */}
               <div className="relative">
-                <Button size="sm" variant="outline" onClick={() => setShowImport((s) => !s)}>
+                <Button size="sm" variant="outline" aria-haspopup="menu" aria-expanded={showImport} onClick={() => setShowImport((s) => !s)}>
                   <GraduationCap className="h-3.5 w-3.5" /> Importar clase
                   <ChevronDown className="h-3 w-3" />
                 </Button>
                 {showImport && (
-                  <div className="absolute right-0 z-20 mt-1 w-64 rounded-lg border border-border bg-popover p-1 shadow-lg">
+                  <div role="menu" className="absolute right-0 z-20 mt-1 w-64 rounded-lg border border-border bg-popover p-1 shadow-lg">
                     {classes.length === 0 ? (
                       <p className="px-3 py-3 text-xs text-muted-foreground">
                         No hay clases guardadas. Créalas en la pestaña «Clases».
@@ -208,8 +225,10 @@ export default function ConfigTable({
                     ) : (
                       classes.map((c) => (
                         <button
+                          type="button"
+                          role="menuitem"
                           key={c.id}
-                          onClick={() => importClass(c)}
+                          onClick={() => void importClass(c)}
                           className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm hover:bg-accent"
                         >
                           <span className="truncate">{c.name}</span>
@@ -224,14 +243,16 @@ export default function ConfigTable({
               </div>
               {/* Añadir campo común */}
               <div className="relative">
-                <Button size="sm" variant="ghost" onClick={() => setShowAddField((s) => !s)}>
+                <Button size="sm" variant="ghost" aria-haspopup="menu" aria-expanded={showAddField} onClick={() => setShowAddField((s) => !s)}>
                   <Plus className="h-3.5 w-3.5" /> {t.editor.addColumn}
                   <ChevronDown className="h-3 w-3" />
                 </Button>
                 {showAddField && (
-                  <div className="absolute right-0 z-20 mt-1 w-60 rounded-lg border border-border bg-popover p-1 shadow-lg">
+                  <div role="menu" className="absolute right-0 z-20 mt-1 w-60 rounded-lg border border-border bg-popover p-1 shadow-lg">
                     {COMMON_FIELDS.filter((f) => !columns.includes(f.key)).map((f) => (
                       <button
+                        type="button"
+                        role="menuitem"
                         key={f.key}
                         onClick={() => addField(f.key)}
                         className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-accent"
@@ -286,6 +307,7 @@ export default function ConfigTable({
                           <input
                             type={secret ? 'password' : 'text'}
                             value={String(row[col] ?? '')}
+                            aria-label={`${col}, alumno ${rowIdx + 1}`}
                             placeholder={col === 'host1_ip' ? '192.168.1.10' : ''}
                             onChange={(e) => updateCell(rowIdx, col, e.target.value)}
                             className={cn(
@@ -298,6 +320,7 @@ export default function ConfigTable({
                     })}
                     <td className="border-b border-l border-border text-center">
                       <button
+                        type="button"
                         onClick={() => removeCase(rowIdx)}
                         className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         title={t.editor.removeCase}

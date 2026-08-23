@@ -2,6 +2,12 @@
   "name": "teuton-gui",
   "version": "1.0.0",
   "description": "GUI de escritorio para Teutón: gestión de proyectos, edición visual, ejecución y dashboard de evaluación",
+  "homepage": "https://github.com/adr1mt/teuton-gui",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/adr1mt/teuton-gui.git"
+  },
+  "desktopName": "teuton-gui",
   "main": "./out/main/index.js",
   "author": {
     "name": "Adrià Muñoz",
@@ -11,7 +17,7 @@
   "type": "module",
   "scripts": {
     "dev": "electron-vite dev",
-    "build": "electron-vite build",
+    "build": "electron-vite build && npm run verify:preload",
     "start": "electron-vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -20,8 +26,9 @@
     "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
     "typecheck": "npm run typecheck:node && npm run typecheck:web && npm run typecheck:test",
     "verify:parsing": "esbuild scripts/verify-parsing.ts --bundle --platform=node --format=esm --outfile=/tmp/teuton-verify.mjs --external:electron && node /tmp/teuton-verify.mjs",
-    "dist": "electron-vite build && electron-builder",
-    "dist:linux": "electron-vite build && electron-builder --linux AppImage deb",
+    "verify:preload": "node scripts/verify-preload.mjs",
+    "dist": "npm run build && electron-builder",
+    "dist:linux": "npm run build && electron-builder --linux AppImage deb",
     "icon": "python3 scripts/make-icon.py"
   },
   "build": {
@@ -50,8 +57,11 @@
       "synopsis": "Interfaz gráfica para Teutón",
       "description": "Corrige prácticas con Teutón y publica notas en Moodle.",
       "desktop": {
-        "Name": "Teutón GUI",
-        "Keywords": "teuton;evaluacion;notas;aula;"
+        "entry": {
+          "Name": "Teutón GUI",
+          "Keywords": "teuton;evaluacion;notas;aula;",
+          "StartupWMClass": "teuton-gui"
+        }
       },
       "target": [
         "AppImage",
@@ -60,21 +70,21 @@
     }
   },
   "dependencies": {
-    "js-yaml": "^4.1.0"
+    "js-yaml": "^4.3.1"
   },
   "devDependencies": {
     "@monaco-editor/react": "^4.6.0",
     "@types/js-yaml": "^4.0.9",
-    "@types/node": "^20.14.10",
+    "@types/node": "^22.20.1",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.1",
+    "@vitejs/plugin-react": "^5.2.0",
     "autoprefixer": "^10.4.19",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
-    "electron": "^31.2.0",
-    "electron-builder": "^24.13.3",
-    "electron-vite": "^2.3.0",
+    "electron": "^43.4.1",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
     "lucide-react": "^0.408.0",
     "monaco-editor": "^0.50.0",
     "postcss": "^8.4.39",
@@ -84,7 +94,7 @@
     "tailwind-merge": "^2.4.0",
     "tailwindcss": "^3.4.6",
     "typescript": "^5.5.3",
-    "vite": "^5.3.3",
+    "vite": "^7.3.6",
     "vitest": "^4.1.10",
     "zustand": "^4.5.4"
   }

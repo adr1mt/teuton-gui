@@ -9,7 +9,7 @@ const api: TeutonApi = {
   openProject: (dir, cname) => ipcRenderer.invoke(IPC.openProject, dir, cname),
   saveProject: (files) => ipcRenderer.invoke(IPC.saveProject, files),
   check: (dir, cname) => ipcRenderer.invoke(IPC.check, dir, cname),
-  run: (dir, options) => ipcRenderer.invoke(IPC.runStart, dir, options),
+  run: (dir, options, runId) => ipcRenderer.invoke(IPC.runStart, dir, options, runId),
   cancelRun: (runId) => ipcRenderer.invoke(IPC.runCancel, runId),
   onRunEvent: (cb) => {
     const listener = (_e: unknown, event: RunEvent): void => cb(event)

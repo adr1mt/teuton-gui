@@ -13,5 +13,5 @@
     "types": ["node"],
     "noEmit": true
   },
-  "include": ["tests/**/*", "vitest.config.ts"]
+  "include": ["tests/**/*", "vitest.config.ts", "src/renderer/src/vite-env.d.ts", "src/preload/index.d.ts"]
 }

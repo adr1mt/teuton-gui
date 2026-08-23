@@ -1,7 +1,7 @@
 import { ipcMain, dialog, shell, BrowserWindow, app } from 'electron'
-import { randomUUID } from 'node:crypto'
+import type { IpcMainInvokeEvent } from 'electron'
 import { promises as fs } from 'node:fs'
-import { join, isAbsolute, resolve, basename } from 'node:path'
+import { join, basename } from 'node:path'
 import type { ChildProcess } from 'node:child_process'
 import { IPC } from '../shared/ipc'
 import type { ExportFormat, RunEvent, RunOptions } from '../shared/types'
@@ -31,15 +31,22 @@ import {
   getTeutonPath,
   setTeutonPath
 } from './store'
+import {
+  validatedGlobals,
+  validatedGrading,
+  validatedMeta,
+  validatedOptionalId,
+  validatedPath,
+  validatedRecords,
+  validatedRoster,
+  validatedText
+} from './validation'
 
-const activeRuns = new Map<string, ChildProcess>()
+const activeRuns = new Map<string, { child: ChildProcess; dir: string }>()
 const EXPORT_FORMATS = new Set<ExportFormat>(['txt', 'html', 'yaml', 'json', 'xml', 'markdown', 'colored_text'])
 
 function projectDir(value: unknown): string {
-  if (typeof value !== 'string' || !isAbsolute(value) || value.includes('\0')) {
-    throw new Error('La ruta del proyecto no es válida.')
-  }
-  return resolve(value)
+  return validatedPath(value, 'La ruta del proyecto')
 }
 
 function fileName(value: unknown, label: string): string {
@@ -64,6 +71,36 @@ function runOptions(value: unknown): RunOptions {
     throw new Error('Los casos seleccionados no son válidos.')
   }
   return { cname: cname(options.cname), cases }
+}
+
+function runIdentifier(value: unknown): string {
+  const id = validatedText(value, 'El identificador de ejecución', 64)
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+    throw new Error('El identificador de ejecución no es válido.')
+  }
+  return id
+}
+
+function isTrustedSender(event: IpcMainInvokeEvent): boolean {
+  const senderUrl = event.senderFrame?.url || event.sender.getURL()
+  if (app.isPackaged) return senderUrl.startsWith('file:') && senderUrl.endsWith('/renderer/index.html')
+  const devUrl = process.env['ELECTRON_RENDERER_URL']
+  if (!devUrl) return senderUrl.startsWith('file:')
+  try {
+    return new URL(senderUrl).origin === new URL(devUrl).origin
+  } catch {
+    return false
+  }
+}
+
+function handle(
+  channel: string,
+  listener: (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown
+): void {
+  ipcMain.handle(channel, (event, ...args) => {
+    if (!isTrustedSender(event)) throw new Error('Origen IPC no autorizado.')
+    return listener(event, ...args)
+  })
 }
 
 const KILL_ESCALATION_MS = 3000
@@ -114,7 +151,7 @@ function cancelProcess(child: ChildProcess, options: { immediate?: boolean } = {
 
 /** Detiene los procesos de evaluación al salir de la aplicación. */
 export function stopActiveRuns(): void {
-  for (const child of activeRuns.values()) cancelProcess(child, { immediate: true })
+  for (const { child } of activeRuns.values()) cancelProcess(child, { immediate: true })
   activeRuns.clear()
 }
 
@@ -125,25 +162,30 @@ function broadcast(event: RunEvent): void {
 }
 
 export function registerIpc(): void {
-  ipcMain.handle(IPC.detect, () => detectTeuton())
+  handle(IPC.detect, () => detectTeuton())
 
-  ipcMain.handle(IPC.pickDirectory, async () => {
+  handle(IPC.pickDirectory, async () => {
     const res = await dialog.showOpenDialog({
       properties: ['openDirectory', 'createDirectory']
     })
     return res.canceled || res.filePaths.length === 0 ? null : res.filePaths[0]
   })
 
-  ipcMain.handle(IPC.createProject, (_e, dir: unknown) => createProject(projectDir(dir)))
+  handle(IPC.createProject, (_e, dir) => createProject(projectDir(dir)))
 
-  ipcMain.handle(IPC.openProject, (_e, dir: unknown, configName?: unknown) =>
+  handle(IPC.openProject, (_e, dir, configName) =>
     openProject(projectDir(dir), cname(configName))
   )
 
-  ipcMain.handle(IPC.saveProject, (_e, files: unknown) => {
+  handle(IPC.saveProject, (_e, files) => {
     if (!files || typeof files !== 'object') throw new Error('Los ficheros del proyecto no son válidos.')
     const input = files as Record<string, unknown>
-    if (typeof input.script !== 'string' || typeof input.config !== 'string') throw new Error('El contenido del proyecto no es válido.')
+    if (
+      typeof input.script !== 'string' ||
+      typeof input.config !== 'string' ||
+      input.script.length > 10_000_000 ||
+      input.config.length > 10_000_000
+    ) throw new Error('El contenido del proyecto no es válido o es demasiado grande.')
     return saveProject({
       dir: projectDir(input.dir),
       scriptFile: fileName(input.scriptFile, 'El fichero de script'),
@@ -153,7 +195,7 @@ export function registerIpc(): void {
     })
   })
 
-  ipcMain.handle(IPC.check, async (_e, dir: unknown, configName?: unknown) => {
+  handle(IPC.check, async (_e, dir, configName) => {
     const safeDir = projectDir(dir)
     const safeCname = cname(configName)
     const args = ['check']
@@ -167,10 +209,14 @@ export function registerIpc(): void {
     }
   })
 
-  ipcMain.handle(IPC.runStart, async (_e, dir: unknown, options: unknown) => {
-    const runId = randomUUID()
-    const { child, testName } = await spawnRun(projectDir(dir), runOptions(options))
-    activeRuns.set(runId, child)
+  handle(IPC.runStart, async (_e, dir, options, requestedRunId) => {
+    const safeDir = projectDir(dir)
+    const runId = runIdentifier(requestedRunId)
+    if ([...activeRuns.values()].some((run) => run.dir === safeDir && isAlive(run.child))) {
+      throw new Error('Ya hay una evaluación activa para este proyecto.')
+    }
+    const { child, testName } = await spawnRun(safeDir, runOptions(options))
+    activeRuns.set(runId, { child, dir: safeDir })
 
     child.stdout?.on('data', (d: Buffer) =>
       broadcast({ runId, type: 'stdout', data: d.toString() })
@@ -190,19 +236,20 @@ export function registerIpc(): void {
     return { runId }
   })
 
-  ipcMain.handle(IPC.runCancel, (_e, runId: string) => {
-    const child = activeRuns.get(runId)
-    if (child) {
-      cancelProcess(child)
+  handle(IPC.runCancel, (_e, value) => {
+    const runId = runIdentifier(value)
+    const active = activeRuns.get(runId)
+    if (active) {
+      cancelProcess(active.child)
       activeRuns.delete(runId)
     }
   })
 
-  ipcMain.handle(IPC.loadResults, (_e, dir: unknown, testName?: unknown) =>
+  handle(IPC.loadResults, (_e, dir, testName) =>
     loadResults(projectDir(dir), testName === undefined ? undefined : fileName(testName, 'El nombre del test'))
   )
 
-  ipcMain.handle(IPC.exportAs, async (_e, dir: unknown, format: unknown) => {
+  handle(IPC.exportAs, async (_e, dir, format) => {
     if (!EXPORT_FORMATS.has(format as ExportFormat)) throw new Error('El formato de exportación no es válido.')
     const res = await runTeutonSync(['run', `--export=${format}`, '.'], projectDir(dir), 120000)
     return {
@@ -212,19 +259,21 @@ export function registerIpc(): void {
     }
   })
 
-  ipcMain.handle(IPC.saveFileDialog, async (_e, defaultName: string, content: string) => {
+  handle(IPC.saveFileDialog, async (_e, defaultName, content) => {
+    const safeName = fileName(defaultName, 'El nombre del fichero')
+    const safeContent = validatedText(content, 'El contenido del fichero', 20_000_000, true)
     const res = await dialog.showSaveDialog({
-      defaultPath: join(app.getPath('documents'), defaultName)
+      defaultPath: join(app.getPath('documents'), safeName)
     })
     if (res.canceled || !res.filePath) return null
-    await fs.writeFile(res.filePath, content, 'utf-8')
+    await fs.writeFile(res.filePath, safeContent, 'utf-8')
     return res.filePath
   })
 
-  ipcMain.handle(IPC.recentProjects, () => getRecents())
-  ipcMain.handle(IPC.removeRecent, (_e, dir: string) => removeRecent(dir))
-  ipcMain.handle(IPC.openPath, (_e, target: string) => shell.openPath(target))
-  ipcMain.handle(IPC.openExternal, (_e, url: string) => {
+  handle(IPC.recentProjects, () => getRecents())
+  handle(IPC.removeRecent, (_e, dir) => removeRecent(projectDir(dir)))
+  handle(IPC.openPath, (_e, target) => shell.openPath(validatedPath(target, 'La ruta')))
+  handle(IPC.openExternal, (_e, url) => {
     // Lista blanca de esquemas: nunca abrir file: u otros esquemas peligrosos.
     if (typeof url === 'string' && /^(https?|mailto):/i.test(url)) {
       return shell.openExternal(url)
@@ -232,37 +281,49 @@ export function registerIpc(): void {
     return undefined
   })
 
-  ipcMain.handle(IPC.getGrading, () => getGrading())
-  ipcMain.handle(IPC.setGrading, (_e, grading) => setGrading(grading))
+  handle(IPC.getGrading, () => getGrading())
+  handle(IPC.setGrading, (_e, grading) => setGrading(validatedGrading(grading)))
 
-  ipcMain.handle(IPC.getTeutonPath, () => getTeutonPath())
-  ipcMain.handle(IPC.setTeutonPath, async (_e, path: unknown) => {
-    if (path !== null && typeof path !== 'string') {
-      throw new Error('La ruta de teuton no es válida.')
-    }
-    await setTeutonPath(path)
+  handle(IPC.getTeutonPath, () => getTeutonPath())
+  handle(IPC.setTeutonPath, async (_e, path) => {
+    if (path !== null && path !== '' && typeof path !== 'string') throw new Error('La ruta de teuton no es válida.')
+    const safePath = path === null || path === '' ? null : validatedPath(path, 'La ruta de teuton')
+    await setTeutonPath(safePath)
     resetTeutonCache()
     return detectTeuton()
   })
 
-  ipcMain.handle(IPC.getDefaultGlobals, () => getDefaultGlobals())
-  ipcMain.handle(IPC.setDefaultGlobals, (_e, globals) => setDefaultGlobals(globals))
+  handle(IPC.getDefaultGlobals, () => getDefaultGlobals())
+  handle(IPC.setDefaultGlobals, (_e, globals) => setDefaultGlobals(validatedGlobals(globals)))
 
-  ipcMain.handle(IPC.listClasses, () => listClasses())
-  ipcMain.handle(IPC.saveClass, (_e, roster) => saveClass(roster))
-  ipcMain.handle(IPC.deleteClass, (_e, id: string) => deleteClass(id))
+  handle(IPC.listClasses, () => listClasses())
+  handle(IPC.saveClass, (_e, roster) => saveClass(validatedRoster(roster)))
+  handle(IPC.deleteClass, (_e, id) => deleteClass(validatedText(id, 'El identificador de la clase', 128)))
 
-  ipcMain.handle(IPC.getRecords, (_e, dir: string, classId?: string) => getRecords(dir, classId))
-  ipcMain.handle(IPC.updateRecords, (_e, dir: string, grades, classId?: string) =>
-    updateRecords(dir, grades, classId)
+  handle(IPC.getRecords, (_e, dir, classId) =>
+    getRecords(projectDir(dir), validatedOptionalId(classId, 'El identificador de la clase'))
   )
-  ipcMain.handle(IPC.resetRecords, (_e, dir: string, classId?: string) =>
-    resetRecords(dir, classId)
+  handle(IPC.updateRecords, (_e, dir, grades, classId) =>
+    updateRecords(
+      projectDir(dir),
+      validatedRecords(grades),
+      validatedOptionalId(classId, 'El identificador de la clase')
+    )
+  )
+  handle(IPC.resetRecords, (_e, dir, classId) =>
+    resetRecords(projectDir(dir), validatedOptionalId(classId, 'El identificador de la clase'))
   )
 
-  ipcMain.handle(IPC.getProjectMeta, (_e, dir: string) => getProjectMeta(dir))
-  ipcMain.handle(IPC.setProjectMeta, (_e, dir: string, meta) => setProjectMeta(dir, meta))
-  ipcMain.handle(IPC.writeClassCsv, (_e, dir: string, className: string, classId: string | undefined, content: string) =>
-    writeClassCsv(dir, className, classId, content)
+  handle(IPC.getProjectMeta, (_e, dir) => getProjectMeta(projectDir(dir)))
+  handle(IPC.setProjectMeta, (_e, dir, meta) =>
+    setProjectMeta(projectDir(dir), validatedMeta(meta))
+  )
+  handle(IPC.writeClassCsv, (_e, dir, className, classId, content) =>
+    writeClassCsv(
+      projectDir(dir),
+      validatedText(className, 'El nombre de la clase', 128),
+      validatedOptionalId(classId, 'El identificador de la clase'),
+      validatedText(content, 'El contenido del CSV', 20_000_000, true)
+    )
   )
 }

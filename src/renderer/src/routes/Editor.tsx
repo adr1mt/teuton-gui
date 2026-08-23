@@ -27,6 +27,7 @@ export default function Editor() {
   const [savedFlash, setSavedFlash] = useState(false)
   const [checking, setChecking] = useState(false)
   const [check, setCheck] = useState<CheckResult | null>(null)
+  const setOperationalError = useApp((s) => s.setOperationalError)
 
   useEffect(() => {
     setCheck(null)
@@ -57,29 +58,41 @@ export default function Editor() {
     )
   }
 
-  async function save() {
-    if (!project) return
+  async function save(): Promise<boolean> {
+    if (!project) return false
     setSaving(true)
-    await window.teuton.saveProject({
-      dir: project.dir,
-      scriptFile: project.scriptFile,
-      configFile: project.configFile,
-      script: scriptDraft,
-      config: configDraft
-    })
-    markSaved()
-    setSaving(false)
-    setSavedFlash(true)
-    setTimeout(() => setSavedFlash(false), 1500)
+    try {
+      await window.teuton.saveProject({
+        dir: project.dir,
+        scriptFile: project.scriptFile,
+        configFile: project.configFile,
+        script: scriptDraft,
+        config: configDraft
+      })
+      markSaved()
+      setSavedFlash(true)
+      setTimeout(() => setSavedFlash(false), 1500)
+      return true
+    } catch (cause) {
+      setOperationalError(`No se pudieron guardar los cambios: ${cause instanceof Error ? cause.message : String(cause)}`)
+      return false
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function runCheck() {
     if (!project) return
     setChecking(true)
-    if (dirty) await save()
-    const res = await window.teuton.check(project.dir, project.cname)
-    setCheck(res)
-    setChecking(false)
+    try {
+      if (dirty && !(await save())) return
+      const res = await window.teuton.check(project.dir, project.cname)
+      setCheck(res)
+    } catch (cause) {
+      setOperationalError(`No se pudo comprobar el proyecto: ${cause instanceof Error ? cause.message : String(cause)}`)
+    } finally {
+      setChecking(false)
+    }
   }
 
   return (

@@ -26,12 +26,18 @@ export default function Settings() {
   const [manualPath, setManualPath] = useState('')
   const [savingPath, setSavingPath] = useState(false)
   const [pathSaved, setPathSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [gradingDraft, setGradingDraft] = useState(grading)
+
+  useEffect(() => setGradingDraft(grading), [grading])
 
   useEffect(() => {
     let cancelled = false
-    window.teuton.getTeutonPath().then((p) => {
-      if (!cancelled) setManualPath(p ?? '')
-    })
+    window.teuton.getTeutonPath()
+      .then((p) => {
+        if (!cancelled) setManualPath(p ?? '')
+      })
+      .catch((cause) => !cancelled && setError(`No se pudo leer la ruta de Teutón: ${cause instanceof Error ? cause.message : String(cause)}`))
     return () => {
       cancelled = true
     }
@@ -39,18 +45,33 @@ export default function Settings() {
 
   async function saveManualPath() {
     setSavingPath(true)
-    const status = await window.teuton.setTeutonPath(manualPath.trim() || null)
-    setTeutonStatus(status)
-    setSavingPath(false)
-    setPathSaved(true)
-    setTimeout(() => setPathSaved(false), 1500)
+    setError(null)
+    try {
+      const status = await window.teuton.setTeutonPath(manualPath.trim() || null)
+      setTeutonStatus(status)
+      setPathSaved(true)
+      setTimeout(() => setPathSaved(false), 1500)
+    } catch (cause) {
+      setError(`No se pudo guardar la ruta: ${cause instanceof Error ? cause.message : String(cause)}`)
+    } finally {
+      setSavingPath(false)
+    }
   }
 
-  async function saveGrading(next: { passScore: number; maxGrade: number }) {
-    setGrading(next)
-    await window.teuton.setGrading(next)
-    setGradingSaved(true)
-    setTimeout(() => setGradingSaved(false), 1500)
+  async function saveGrading() {
+    setError(null)
+    if (!Number.isInteger(gradingDraft.passScore) || gradingDraft.passScore < 1 || gradingDraft.passScore > 99 || !Number.isFinite(gradingDraft.maxGrade) || gradingDraft.maxGrade <= 0 || gradingDraft.maxGrade > 100) {
+      setError('Revisa la escala: el aprobado debe ser un entero entre 1 y 99 y la nota máxima debe estar entre 0 y 100.')
+      return
+    }
+    try {
+      await window.teuton.setGrading(gradingDraft)
+      setGrading(gradingDraft)
+      setGradingSaved(true)
+      setTimeout(() => setGradingSaved(false), 1500)
+    } catch (cause) {
+      setError(`No se pudo guardar la escala: ${cause instanceof Error ? cause.message : String(cause)}`)
+    }
   }
 
   // Editamos las credenciales como lista local de pares para poder mostrar filas
@@ -70,18 +91,30 @@ export default function Settings() {
     setFocusRow(null)
   }, [focusRow])
 
-  async function persistGlobals(rows: [string, string][]) {
-    setGlobalRows(rows)
+  async function persistGlobals() {
     const obj: Record<string, string> = {}
-    for (const [k, v] of rows) if (k.trim()) obj[k.trim()] = v
-    setDefaultGlobals(obj)
-    await window.teuton.setDefaultGlobals(obj)
-    setGlobalsSaved(true)
-    setTimeout(() => setGlobalsSaved(false), 1500)
+    for (const [k, v] of globalRows) {
+      const key = k.trim()
+      if (!key) continue
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        setError(`El campo «${key}» está repetido.`)
+        return
+      }
+      obj[key] = v
+    }
+    setError(null)
+    try {
+      await window.teuton.setDefaultGlobals(obj)
+      setDefaultGlobals(obj)
+      setGlobalsSaved(true)
+      setTimeout(() => setGlobalsSaved(false), 1500)
+    } catch (cause) {
+      setError(`No se pudieron guardar las credenciales: ${cause instanceof Error ? cause.message : String(cause)}`)
+    }
   }
 
   function updateGlobalRow(idx: number, key: string, value: string) {
-    void persistGlobals(globalRows.map((r, i) => (i === idx ? [key, value] : r)))
+    setGlobalRows(globalRows.map((r, i) => (i === idx ? [key, value] : r)))
   }
 
   function addGlobalRow() {
@@ -90,20 +123,30 @@ export default function Settings() {
   }
 
   function removeGlobalRow(idx: number) {
-    void persistGlobals(globalRows.filter((_, i) => i !== idx))
+    setGlobalRows(globalRows.filter((_, i) => i !== idx))
   }
 
   async function recheck() {
     setChecking(true)
-    const status = await window.teuton.detect()
-    setTeutonStatus(status)
-    setChecking(false)
+    setError(null)
+    try {
+      const status = await window.teuton.detect()
+      setTeutonStatus(status)
+    } catch (cause) {
+      setError(`No se pudo comprobar Teutón: ${cause instanceof Error ? cause.message : String(cause)}`)
+    } finally {
+      setChecking(false)
+    }
   }
 
-  function copyCmd() {
-    navigator.clipboard.writeText(t.teuton.installHint)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+  async function copyCmd() {
+    try {
+      await navigator.clipboard.writeText(t.teuton.installHint)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch (cause) {
+      setError(`No se pudo copiar el comando: ${cause instanceof Error ? cause.message : String(cause)}`)
+    }
   }
 
   return (
@@ -113,6 +156,12 @@ export default function Settings() {
           centrada, la barra aparecía flotando en mitad del contenido. */}
       <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-14 pt-5">
       <div className="flex max-w-2xl flex-col gap-9">
+
+      {error && (
+        <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive-strong">
+          {error}
+        </div>
+      )}
 
       <section>
         <SectionTitle>Teutón CLI</SectionTitle>
@@ -144,7 +193,9 @@ export default function Settings() {
                   <span className="text-muted-foreground">$</span>
                   <span className="flex-1">{t.teuton.installHint}</span>
                   <button
-                    onClick={copyCmd}
+                    type="button"
+                    onClick={() => void copyCmd()}
+                    aria-label={copied ? 'Comando copiado' : 'Copiar comando de instalación'}
                     className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
                   >
                     {copied ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
@@ -160,10 +211,11 @@ export default function Settings() {
           </Button>
 
           <div className="border-t border-border pt-4">
-            <label className="text-sm font-medium">{t.teuton.manualPathLabel}</label>
+            <label htmlFor="teuton-manual-path" className="text-sm font-medium">{t.teuton.manualPathLabel}</label>
             <p className="mb-1.5 text-xs text-muted-foreground">{t.teuton.manualPathHint}</p>
             <div className="flex items-center gap-2">
               <Input
+                id="teuton-manual-path"
                 value={manualPath}
                 onChange={(e) => setManualPath(e.target.value)}
                 placeholder={t.teuton.manualPathPlaceholder}
@@ -197,28 +249,29 @@ export default function Settings() {
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-medium">{t.grading.passScore}</label>
-              <p className="mb-1.5 text-xs text-muted-foreground">{t.grading.passScoreHint}</p>
+              <label htmlFor="grading-pass-score" className="text-sm font-medium">{t.grading.passScore}</label>
+              <p id="grading-pass-hint" className="mb-1.5 text-xs text-muted-foreground">{t.grading.passScoreHint}</p>
               <Input
+                id="grading-pass-score"
+                aria-describedby="grading-pass-hint"
                 type="number"
                 min={1}
                 max={99}
-                value={grading.passScore}
-                onChange={(e) =>
-                  saveGrading({ ...grading, passScore: Number(e.target.value) || 0 })
-                }
+                value={gradingDraft.passScore}
+                onChange={(e) => setGradingDraft({ ...gradingDraft, passScore: Number(e.target.value) })}
               />
             </div>
             <div>
-              <label className="text-sm font-medium">{t.grading.maxGrade}</label>
-              <p className="mb-1.5 text-xs text-muted-foreground">{t.grading.maxGradeHint}</p>
+              <label htmlFor="grading-max-grade" className="text-sm font-medium">{t.grading.maxGrade}</label>
+              <p id="grading-max-hint" className="mb-1.5 text-xs text-muted-foreground">{t.grading.maxGradeHint}</p>
               <Input
+                id="grading-max-grade"
+                aria-describedby="grading-max-hint"
                 type="number"
                 min={1}
-                value={grading.maxGrade}
-                onChange={(e) =>
-                  saveGrading({ ...grading, maxGrade: Number(e.target.value) || 0 })
-                }
+                max={100}
+                value={gradingDraft.maxGrade}
+                onChange={(e) => setGradingDraft({ ...gradingDraft, maxGrade: Number(e.target.value) })}
               />
             </div>
           </div>
@@ -228,8 +281,8 @@ export default function Settings() {
               {t.grading.preview}
             </div>
             <div className="grid grid-cols-5 divide-x divide-border rounded-md border border-border text-center">
-              {[0, 40, grading.passScore, 85, 100].map((score, i) => {
-                const pass = score >= grading.passScore
+              {[0, 40, gradingDraft.passScore, 85, 100].map((score, i) => {
+                const pass = score >= gradingDraft.passScore
                 return (
                   <div key={i} className="px-2 py-2.5">
                     <div className="tnum text-xs text-muted-foreground">{score} pts</div>
@@ -239,7 +292,7 @@ export default function Settings() {
                         pass ? 'text-success-strong' : 'text-destructive-strong'
                       )}
                     >
-                      {formatGrade(score, grading)}
+                      {formatGrade(score, gradingDraft)}
                     </div>
                   </div>
                 )
@@ -247,11 +300,14 @@ export default function Settings() {
             </div>
           </div>
 
-          {gradingSaved && (
-            <div className="flex items-center gap-1.5 text-sm text-success-strong">
-              <Check className="h-4 w-4" /> {t.grading.saved}
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            <Button size="sm" onClick={() => void saveGrading()}>Guardar escala</Button>
+            {gradingSaved && (
+              <div role="status" className="flex items-center gap-1.5 text-sm text-success-strong">
+                <Check className="h-4 w-4" /> {t.grading.saved}
+              </div>
+            )}
+          </div>
         </div>
       </section>
 
@@ -270,6 +326,7 @@ export default function Settings() {
                 <Input
                   ref={(el) => (keyInputs.current[i] = el)}
                   value={key}
+                  aria-label={`${t.credentials.field} ${i + 1}`}
                   placeholder="host2_ip"
                   onChange={(e) => updateGlobalRow(i, e.target.value, value)}
                   className="font-mono text-sm"
@@ -277,10 +334,12 @@ export default function Settings() {
                 <Input
                   type={isSecretColumn(key) ? 'password' : 'text'}
                   value={value}
+                  aria-label={`${t.credentials.value} ${i + 1}`}
                   placeholder="valor"
                   onChange={(e) => updateGlobalRow(i, key, e.target.value)}
                 />
                 <button
+                  type="button"
                   onClick={() => removeGlobalRow(i)}
                   className="rounded-md p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive-strong"
                   aria-label={`Quitar ${key || 'campo'}`}
@@ -295,8 +354,9 @@ export default function Settings() {
             <Button variant="outline" size="sm" onClick={addGlobalRow}>
               <Plus className="h-4 w-4" /> {t.credentials.add}
             </Button>
+            <Button variant="outline" size="sm" onClick={() => void persistGlobals()}>Guardar credenciales</Button>
             {globalsSaved && (
-              <span className="flex items-center gap-1.5 text-sm text-success-strong">
+              <span role="status" className="flex items-center gap-1.5 text-sm text-success-strong">
                 <Check className="h-4 w-4" /> {t.credentials.saved}
               </span>
             )}

@@ -16,6 +16,12 @@ DEST="${TEUTON_GUI_DEST:-/mnt/datos/Aplicaciones/TeutonGUI}"
 # Nombre fijo, sin versión: así la ficha del menú nunca se queda apuntando a un
 # AppImage viejo cuando se sube de versión.
 APPIMAGE="$DEST/TeutonGUI.AppImage"
+case "$APPIMAGE" in
+  *'"'*|*$'\n'*)
+    echo "El destino no puede contener comillas dobles ni saltos de línea." >&2
+    exit 2
+    ;;
+esac
 
 APPS="$HOME/.local/share/applications"
 DESKTOP="$APPS/teuton-gui.desktop"
@@ -25,7 +31,7 @@ if [ "$1" = "--desinstalar" ]; then
   # La ruta real del ejecutable se lee de la propia ficha, así se borra el
   # AppImage correcto aunque esté en otro disco.
   if [ -f "$DESKTOP" ]; then
-    instalado="$(sed -n 's/^Exec=//p' "$DESKTOP" | head -1)"
+    instalado="$(sed -n 's/^Exec="\(.*\)"$/\1/p; s/^Exec=\([^"].*\)$/\1/p' "$DESKTOP" | head -1)"
     if [ -n "$instalado" ] && [ -f "$instalado" ]; then
       rm -f "$instalado"
       rmdir "$(dirname "$instalado")" 2>/dev/null || true
@@ -67,12 +73,12 @@ Type=Application
 Name=Teutón GUI
 GenericName=Corrector de prácticas con Teutón
 Comment=Corrige prácticas con Teutón y publica notas en Moodle
-Exec=$APPIMAGE
+Exec="$APPIMAGE"
 Icon=teuton-gui
 Categories=Education;
 Keywords=teuton;evaluacion;notas;aula;
 Terminal=false
-StartupWMClass=Teuton GUI
+StartupWMClass=teuton-gui
 EOF
 
 chmod +x "$DESKTOP"

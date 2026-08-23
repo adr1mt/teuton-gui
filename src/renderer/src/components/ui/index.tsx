@@ -33,8 +33,8 @@ export interface ButtonProps
     VariantProps<typeof buttonVariants> {}
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, ...props }, ref) => (
-    <button ref={ref} className={cn(buttonVariants({ variant, size }), className)} {...props} />
+  ({ className, variant, size, type = 'button', ...props }, ref) => (
+    <button ref={ref} type={type} className={cn(buttonVariants({ variant, size }), className)} {...props} />
   )
 )
 Button.displayName = 'Button'
@@ -133,13 +133,13 @@ export function ViewHeader({
   return (
     <header
       className={cn(
-        'flex h-14 shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-6',
+        'flex min-h-14 shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-6 py-2',
         className
       )}
     >
       <h1 className="text-ui font-semibold tracking-tight">{title}</h1>
       {meta}
-      {actions && <div className="ml-auto flex items-center gap-2">{actions}</div>}
+      {actions && <div className="ml-auto flex flex-wrap items-center justify-end gap-2">{actions}</div>}
     </header>
   )
 }
@@ -275,19 +275,41 @@ export function ConfirmDialog({
   onCancel: () => void
 }) {
   const cancelRef = React.useRef<HTMLButtonElement>(null)
+  const dialogRef = React.useRef<HTMLDivElement>(null)
+  const titleId = React.useId()
 
   React.useEffect(() => {
     if (!open) return
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
     // El foco arranca en Cancelar: la tecla obvia nunca es la destructiva.
     cancelRef.current?.focus()
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault()
         onCancel()
+      } else if (e.key === 'Tab') {
+        const focusable = Array.from(
+          dialogRef.current?.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+          ) || []
+        )
+        if (focusable.length === 0) return
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault()
+          last.focus()
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault()
+          first.focus()
+        }
       }
     }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      previousFocus?.focus()
+    }
   }, [open, onCancel])
 
   if (!open) return null
@@ -298,13 +320,14 @@ export function ConfirmDialog({
       onClick={onCancel}
     >
       <div
+        ref={dialogRef}
         role="alertdialog"
         aria-modal="true"
-        aria-labelledby="confirm-title"
+        aria-labelledby={titleId}
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-md animate-fade-in rounded-lg border border-border bg-card p-5 shadow-xl"
       >
-        <h2 id="confirm-title" className="text-base font-semibold">
+        <h2 id={titleId} className="text-base font-semibold">
           {title}
         </h2>
         {children && <div className="mt-2 space-y-1.5 text-sm text-muted-foreground">{children}</div>}
@@ -424,17 +447,41 @@ export function Menu({
 }) {
   const [open, setOpen] = React.useState(false)
   const ref = React.useRef<HTMLDivElement>(null)
+  const triggerRef = React.useRef<HTMLButtonElement>(null)
   const close = React.useCallback(() => setOpen(false), [])
 
   React.useEffect(() => {
     if (!open) return
+    const focusFrame = requestAnimationFrame(() => {
+      ref.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
+    })
     const onDown = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) close()
     }
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        close()
+        triggerRef.current?.focus()
+        return
+      }
+      if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return
+      const items = Array.from(ref.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') || [])
+      if (items.length === 0) return
+      e.preventDefault()
+      const current = items.indexOf(document.activeElement as HTMLElement)
+      const next = e.key === 'Home'
+        ? 0
+        : e.key === 'End'
+          ? items.length - 1
+          : e.key === 'ArrowDown'
+            ? (current + 1 + items.length) % items.length
+            : (current - 1 + items.length) % items.length
+      items[next].focus()
+    }
     window.addEventListener('mousedown', onDown)
     window.addEventListener('keydown', onKey)
     return () => {
+      cancelAnimationFrame(focusFrame)
       window.removeEventListener('mousedown', onDown)
       window.removeEventListener('keydown', onKey)
     }
@@ -443,6 +490,7 @@ export function Menu({
   return (
     <div ref={ref} className="relative">
       <Button
+        ref={triggerRef}
         variant="ghost"
         size="sm"
         onClick={() => setOpen((o) => !o)}
@@ -497,6 +545,8 @@ export function MenuItem({
 export function Spinner({ className }: { className?: string }) {
   return (
     <div
+      role="status"
+      aria-label="Cargando"
       className={cn(
         'h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent',
         className

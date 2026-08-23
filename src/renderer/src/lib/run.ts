@@ -1,10 +1,11 @@
 import { useEffect } from 'react'
 import { useApp } from '../stores/app'
-import { studentRows, type StudentRow } from './analytics'
+import { type StudentRow } from './analytics'
 import { parseConfig } from './config'
 import { computeExpectedTotal, INITIAL_SCAN_STATE, parseTargetsFromCheckOutput } from './progress'
 import { buildMoodleCsv } from './moodleCsv'
-import type { LoadedResults, RunOptions } from '../../../shared/types'
+import { gradeRecordsFromResults, validateResultIdentity } from './integrity'
+import type { LoadedResults, RunEvent, RunOptions } from '../../../shared/types'
 
 // Elimina códigos de color ANSI de la salida de teuton. La segunda pasada
 // cubre secuencias cuyo ESC llegó en el chunk anterior de stdout; la tercera
@@ -45,18 +46,21 @@ export async function startRun(dir: string, options: RunOptions): Promise<void> 
   try {
     await saveDraftsIfDirty()
   } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
     useApp.getState().setRun({ status: 'failed' })
     useApp.getState().appendRunLine(
-      `\n[ERROR] No se pudieron guardar los cambios antes de ejecutar: ${e instanceof Error ? e.message : String(e)}`
+      `\n[ERROR] No se pudieron guardar los cambios antes de ejecutar: ${message}`
     )
+    useApp.getState().setOperationalError(`No se pudieron guardar los cambios antes de ejecutar: ${message}`)
     // El modo examen no debe morir por un fallo puntual: reintenta al siguiente ciclo.
     if (useApp.getState().monitor.active) scheduleNextCycle(dir)
     return
   }
   const st = useApp.getState()
+  const runId = crypto.randomUUID()
   useApp.setState({
     run: {
-      status: 'running', log: '', runId: null, testName: null,
+      status: 'running', log: '', runId, testName: null,
       projectDir: dir, classId: st.activeClassId, className: st.activeClass,
       expectedTotal: null,
       // Cada ejecución (incluido cada ciclo de modo examen) arranca el contador
@@ -68,16 +72,19 @@ export async function startRun(dir: string, options: RunOptions): Promise<void> 
 
   // Calcula el total esperado de comprobaciones para la barra de progreso
   // (en paralelo, sin bloquear el arranque de la ejecución real).
-  void estimateExpectedTotal(dir, st.project?.cname, st.configDraft, options.cases).then((total) =>
-    useApp.getState().setRun({ expectedTotal: total })
-  )
+  void estimateExpectedTotal(dir, options.cname ?? st.project?.cname, st.configDraft, options.cases).then((total) => {
+    if (useApp.getState().run.runId === runId) useApp.getState().setRun({ expectedTotal: total })
+  })
 
   try {
-    const handle = await window.teuton.run(dir, options)
-    useApp.getState().setRun({ runId: handle.runId })
+    const handle = await window.teuton.run(dir, options, runId)
+    if (handle.runId !== runId) throw new Error('El proceso devolvió un identificador de ejecución inesperado.')
   } catch (e) {
-    useApp.getState().setRun({ status: 'failed' })
-    useApp.getState().appendRunLine(`\n[ERROR] ${e instanceof Error ? e.message : String(e)}`)
+    if (useApp.getState().run.runId !== runId) return
+    const message = e instanceof Error ? e.message : String(e)
+    useApp.getState().setRun({ status: 'failed', runId: null })
+    useApp.getState().appendRunLine(`\n[ERROR] ${message}`)
+    useApp.getState().setOperationalError(`No se pudo iniciar la evaluación: ${message}`)
     if (useApp.getState().monitor.active) scheduleNextCycle(dir)
   }
 }
@@ -136,8 +143,13 @@ export async function reevaluateStudent(row: StudentRow): Promise<void> {
 
 export async function cancelRun(): Promise<void> {
   const { runId, projectDir } = useApp.getState().run
-  if (runId) await window.teuton.cancelRun(runId)
-  useApp.getState().setRun({ status: 'idle', runId: null })
+  try {
+    if (runId) await window.teuton.cancelRun(runId)
+  } catch (error) {
+    useApp.getState().setOperationalError(`No se pudo cancelar la evaluación: ${error instanceof Error ? error.message : String(error)}`)
+  } finally {
+    useApp.getState().setRun({ status: 'idle', runId: null })
+  }
   // Al anular el runId, el evento `close` del proceso cancelado se descarta y
   // loadAfterExit no llega a ejecutarse: si el modo examen está activo hay que
   // encadenar aquí el siguiente ciclo o el monitor quedaría «activo» sin
@@ -157,21 +169,30 @@ export async function reloadLatestResults(): Promise<LoadedResults | null> {
   if (!project) return null
   useApp.getState().setLoadingResults(true)
   try {
-    const res = await window.teuton.loadResults(project.dir)
-    useApp.getState().setResults(res)
-    const grades: Record<string, number> = {}
-    for (const row of studentRows(res)) {
-      if (row.members !== '-' && row.members !== '') grades[row.members] = row.grade
-    }
     const meta = await window.teuton.getProjectMeta(project.dir)
     // Campo ausente (proyecto de una versión anterior): asumimos la clase
     // activa, el único comportamiento posible hasta ahora.
     const runClassId =
       meta.lastRunClassId === undefined ? useApp.getState().activeClassId : meta.lastRunClassId
-    const rec = await window.teuton.updateRecords(project.dir, grades, runClassId ?? undefined)
-    // Solo refrescamos los récords en pantalla si pertenecen a la clase activa.
-    if (useApp.getState().activeClassId === runClassId) useApp.getState().setRecords(rec)
+    const runClassName =
+      meta.lastRunClassName === undefined ? useApp.getState().activeClass : meta.lastRunClassName
+    const loaded = await window.teuton.loadResults(project.dir)
+    const res = { ...loaded, classId: runClassId, className: runClassName }
+    useApp.getState().setResults(res)
+    const { grades, issues } = gradeRecordsFromResults(res)
+    if (issues.length > 0) {
+      useApp.getState().setOperationalError(issues.map((issue) => issue.message).join(' '))
+      useApp.getState().setRecords(await window.teuton.getRecords(project.dir, runClassId ?? undefined))
+      return res
+    }
+    const outcome = await window.teuton.updateRecords(project.dir, grades, runClassId ?? undefined)
+    useApp.getState().setRecords(outcome.data)
+    if (!outcome.persisted) useApp.getState().setOperationalError(outcome.warning || 'No se pudieron guardar los récords.')
     return res
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    useApp.getState().setOperationalError(`No se pudieron cargar los últimos resultados: ${message}`)
+    return null
   } finally {
     useApp.getState().setLoadingResults(false)
   }
@@ -188,12 +209,12 @@ let monitorTimer: ReturnType<typeof setTimeout> | null = null
  * pendiente, pondría el contador de ciclos a 0 y arrastraría la vista al
  * dashboard a mitad de examen. Quien quiera parar tiene el botón de parada.
  */
-export function startMonitor(dir: string, intervalMin: number): void {
+export function startMonitor(dir: string, intervalMin: number, cname?: string): void {
   if (useApp.getState().monitor.active) return
   clearMonitorTimer()
-  useApp.getState().setMonitor({ active: true, intervalMin, nextRunAt: null, cycles: 0 })
+  useApp.getState().setMonitor({ active: true, intervalMin, nextRunAt: null, cycles: 1 })
   useApp.getState().setView('dashboard')
-  void startRun(dir, {}) // primer ciclo inmediato (todos los alumnos)
+  void startRun(dir, { cname }) // primer ciclo inmediato (todos los alumnos)
 }
 
 export function stopMonitor(): void {
@@ -214,12 +235,13 @@ function scheduleNextCycle(dir: string): void {
   if (!monitor.active) return
   const intervalMs = Math.max(1, monitor.intervalMin) * 60_000
   const nextRunAt = Date.now() + intervalMs
-  useApp.getState().setMonitor({ nextRunAt, cycles: monitor.cycles + 1 })
+  useApp.getState().setMonitor({ nextRunAt })
   clearMonitorTimer()
   monitorTimer = setTimeout(() => {
     const st = useApp.getState()
     if (st.monitor.active && st.project?.dir === dir) {
-      void startRun(dir, {})
+      st.setMonitor({ nextRunAt: null, cycles: st.monitor.cycles + 1 })
+      void startRun(dir, { cname: st.project.cname })
     }
   }, intervalMs)
 }
@@ -230,37 +252,41 @@ function scheduleNextCycle(dir: string): void {
  */
 export function useRunManager(): void {
   useEffect(() => {
-    const unsub = window.teuton.onRunEvent((ev) => {
-      const st = useApp.getState()
-      const activeId = st.run.runId
-      // Ignora procesos ya cancelados o de una ejecución anterior. Sin este
-      // guard, el evento `close` de un proceso cancelado podía recargar sus
-      // resultados y alterar el dashboard después de pulsar «Cancelar».
-      if (!activeId || ev.runId !== activeId) return
-
-      if (ev.type === 'stdout' || ev.type === 'stderr') {
-        st.appendRunLine(stripAnsi(ev.data))
-      } else if (ev.type === 'error') {
-        st.appendRunLine(`\n[ERROR] ${ev.message}`)
-        st.flushRunProgress()
-        st.setRun({ status: 'failed', runId: null })
-      } else if (ev.type === 'exit') {
-        st.flushRunProgress()
-        const context = {
-          projectDir: st.run.projectDir,
-          classId: st.run.classId,
-          className: st.run.className
-        }
-        st.setRun({
-          status: ev.code === 0 ? 'done' : 'failed',
-          runId: null,
-          testName: ev.testName
-        })
-        void loadAfterExit(ev.code, ev.testName, context)
-      }
-    })
+    const unsub = window.teuton.onRunEvent(handleRunEvent)
     return unsub
   }, [])
+}
+
+/** Procesa un evento del proceso activo; exportado para probar carreras y errores. */
+export function handleRunEvent(ev: RunEvent): void {
+  const st = useApp.getState()
+  const activeId = st.run.runId
+  // Ignora procesos ya cancelados o de una ejecución anterior.
+  if (!activeId || ev.runId !== activeId) return
+
+  if (ev.type === 'stdout' || ev.type === 'stderr') {
+    st.appendRunLine(stripAnsi(ev.data))
+  } else if (ev.type === 'error') {
+    const projectDir = st.run.projectDir
+    st.appendRunLine(`\n[ERROR] ${ev.message}`)
+    st.flushRunProgress()
+    st.setRun({ status: 'failed', runId: null })
+    st.setOperationalError(`La evaluación falló: ${ev.message}`)
+    if (st.monitor.active && projectDir) scheduleNextCycle(projectDir)
+  } else if (ev.type === 'exit') {
+    st.flushRunProgress()
+    const context = {
+      projectDir: st.run.projectDir,
+      classId: st.run.classId,
+      className: st.run.className
+    }
+    st.setRun({
+      status: ev.code === 0 ? 'done' : 'failed',
+      runId: null,
+      testName: ev.testName
+    })
+    void loadAfterExit(ev.code, ev.testName, context)
+  }
 }
 
 async function loadAfterExit(
@@ -275,23 +301,36 @@ async function loadAfterExit(
   }
   if (isCurrentContext()) useApp.getState().setLoadingResults(true)
   try {
-    const res = await window.teuton.loadResults(context.projectDir, testName ?? undefined)
+    const loaded = await window.teuton.loadResults(context.projectDir, testName ?? undefined)
+    const res = { ...loaded, classId: context.classId, className: context.className }
     if (isCurrentContext()) useApp.getState().setResults(res)
     // Recuerda qué clase produjo estos resultados: «cargar últimos resultados»
     // los atribuirá a ella aunque el profesor cambie de grupo entre medias.
-    void window.teuton.setProjectMeta(context.projectDir, { lastRunClassId: context.classId })
+    await window.teuton.setProjectMeta(context.projectDir, {
+      lastRunClassId: context.classId,
+      lastRunClassName: context.className
+    })
     // Actualiza el récord histórico de mejor nota por alumno.
-    const grades: Record<string, number> = {}
-    for (const row of studentRows(res)) {
-      if (row.members !== '-' && row.members !== '') grades[row.members] = row.grade
+    const { grades, issues } = gradeRecordsFromResults(res)
+    if (issues.length > 0) {
+      useApp.getState().setOperationalError(issues.map((issue) => issue.message).join(' '))
+      if (isCurrentContext()) {
+        useApp.getState().setRecords(
+          await window.teuton.getRecords(context.projectDir, context.classId ?? undefined)
+        )
+      }
+      return
     }
     const grading = useApp.getState().grading
-    const rec = await window.teuton.updateRecords(context.projectDir, grades, context.classId ?? undefined)
+    const outcome = await window.teuton.updateRecords(context.projectDir, grades, context.classId ?? undefined)
+    const rec = outcome.data
     if (isCurrentContext()) useApp.getState().setRecords(rec)
+    if (!outcome.persisted) useApp.getState().setOperationalError(outcome.warning || 'No se pudieron guardar los récords.')
     // Genera/actualiza el CSV de Moodle de la clase activa con las MEJORES notas
     // (informes/moodle-<clase>.csv). Un fichero por clase: al pasar el mismo
     // examen a otro grupo se crea otro CSV y ambos coexisten como historial.
-    if ((res.resume?.cases.length ?? 0) > 0) {
+    const exportIssues = validateResultIdentity(res)
+    if ((res.resume?.cases.length ?? 0) > 0 && exportIssues.length === 0) {
       const csvName = context.className || res.testName || 'clase'
       try {
         await window.teuton.writeClassCsv(
@@ -300,14 +339,22 @@ async function loadAfterExit(
           context.classId ?? undefined,
           buildMoodleCsv(res, rec, grading)
         )
-      } catch {
-        // El CSV automático es un extra: no rompemos el flujo si falla.
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        useApp.getState().setOperationalError(`Las notas se calcularon, pero no se pudo guardar el CSV: ${message}`)
       }
+    } else if (exportIssues.length > 0) {
+      useApp.getState().setOperationalError(
+        `No se generó el CSV automático: ${exportIssues.map((issue) => issue.message).join(' ')}`
+      )
     }
     // Navega a resultados solo si veníamos de la pestaña de ejecución manual.
     if (code === 0 && isCurrentContext() && useApp.getState().view === 'run' && !useApp.getState().monitor.active) {
       useApp.getState().setView('dashboard')
     }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    useApp.getState().setOperationalError(`No se pudo completar el procesamiento de resultados: ${message}`)
   } finally {
     if (isCurrentContext()) useApp.getState().setLoadingResults(false)
     // Si el modo examen sigue activo, encadena el siguiente ciclo.

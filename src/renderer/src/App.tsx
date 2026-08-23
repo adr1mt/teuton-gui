@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { Component, lazy, Suspense, useEffect, type ErrorInfo, type ReactNode } from 'react'
 import {
   Home,
   FileCode2,
@@ -13,20 +13,21 @@ import {
   CheckCircle2,
   AlertTriangle,
   Loader2
+  , X
 } from 'lucide-react'
 import { useApp, type View } from './stores/app'
 import { cn } from './lib/utils'
 import { t } from './i18n/es'
 import { useRunManager } from './lib/run'
 import { MonitorSidebarStatus } from './components/Monitor'
-import HomeView from './routes/Home'
-import EditorView from './routes/Editor'
-import RunView from './routes/Run'
-import DashboardView from './routes/Dashboard'
-import AnalyticsView from './routes/Analytics'
-import ClassesView from './routes/Classes'
-import SettingsView from './routes/Settings'
-import HelpView from './routes/Help'
+const HomeView = lazy(() => import('./routes/Home'))
+const EditorView = lazy(() => import('./routes/Editor'))
+const RunView = lazy(() => import('./routes/Run'))
+const DashboardView = lazy(() => import('./routes/Dashboard'))
+const AnalyticsView = lazy(() => import('./routes/Analytics'))
+const ClassesView = lazy(() => import('./routes/Classes'))
+const SettingsView = lazy(() => import('./routes/Settings'))
+const HelpView = lazy(() => import('./routes/Help'))
 
 const NAV: { id: View; label: string; icon: typeof Home; needsProject?: boolean }[] = [
   { id: 'home', label: t.nav.home, icon: Home },
@@ -45,14 +46,20 @@ export default function App() {
   const setGrading = useApp((s) => s.setGrading)
   const setDefaultGlobals = useApp((s) => s.setDefaultGlobals)
   const runStatus = useApp((s) => s.run.status)
+  const operationalError = useApp((s) => s.operationalError)
+  const setOperationalError = useApp((s) => s.setOperationalError)
 
   useRunManager()
 
   useEffect(() => {
-    window.teuton.detect().then(setTeutonStatus)
-    window.teuton.getGrading().then(setGrading)
-    window.teuton.getDefaultGlobals().then(setDefaultGlobals)
-  }, [setTeutonStatus, setGrading, setDefaultGlobals])
+    void Promise.all([
+      window.teuton.detect().then(setTeutonStatus),
+      window.teuton.getGrading().then(setGrading),
+      window.teuton.getDefaultGlobals().then(setDefaultGlobals)
+    ]).catch((error) => {
+      setOperationalError(`No se pudo cargar la configuración: ${error instanceof Error ? error.message : String(error)}`)
+    })
+  }, [setTeutonStatus, setGrading, setDefaultGlobals, setOperationalError])
 
   // Al (re)abrir un proyecto, carga sus datos persistidos (récords y clase
   // activa), sea cual sea la vía. Depende del objeto proyecto (no solo de la
@@ -71,6 +78,13 @@ export default function App() {
         state.setActiveClass(m.activeClass ?? null, m.activeClassId ?? null)
         const records = await window.teuton.getRecords(dir, m.activeClassId)
         if (useApp.getState().project?.dir === dir) useApp.getState().setRecords(records)
+      })
+      .catch((error) => {
+        if (useApp.getState().project?.dir === dir) {
+          useApp.getState().setOperationalError(
+            `No se pudieron cargar los datos del proyecto: ${error instanceof Error ? error.message : String(error)}`
+          )
+        }
       })
   }, [currentProject])
 
@@ -162,8 +176,28 @@ export default function App() {
       {/* La franja de crédito permanente salió de aquí: ocupaba 32px de todas
           las pantallas, incluida la que se proyecta durante el examen. El
           crédito vive en Ajustes → Acerca de. */}
-      <main key={view} className="flex flex-1 animate-fade-in flex-col overflow-hidden bg-background">
-        {views[view]}
+      <main className="flex flex-1 flex-col overflow-hidden bg-background">
+        {operationalError && (
+          <div role="alert" className="flex shrink-0 items-start gap-2 border-b border-destructive/30 bg-destructive/10 px-4 py-2 text-sm text-destructive-strong">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+            <span className="min-w-0 flex-1">{operationalError}</span>
+            <button
+              type="button"
+              onClick={() => setOperationalError(null)}
+              className="rounded p-0.5 hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="Cerrar aviso"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+        <div key={view} className="min-h-0 flex-1 animate-fade-in">
+          <ViewErrorBoundary key={view}>
+            <Suspense fallback={<div className="flex h-full items-center justify-center"><Loader2 className="h-5 w-5 animate-spin" aria-label="Cargando vista" /></div>}>
+              {views[view]}
+            </Suspense>
+          </ViewErrorBoundary>
+        </div>
       </main>
     </div>
   )
@@ -185,6 +219,36 @@ export default function App() {
         <AlertTriangle className="h-4 w-4 shrink-0" />
         <span className="truncate">{t.teuton.notInstalled}</span>
       </button>
+    )
+  }
+}
+
+class ViewErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null }
+
+  static getDerivedStateFromError(error: Error): { error: Error } {
+    return { error }
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo): void {
+    console.error('Error al renderizar la vista', error, info)
+  }
+
+  render(): ReactNode {
+    if (!this.state.error) return this.props.children
+    return (
+      <div role="alert" className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center">
+        <AlertTriangle className="h-8 w-8 text-destructive-strong" />
+        <h1 className="font-semibold">Esta vista no se pudo mostrar</h1>
+        <p className="max-w-xl text-sm text-muted-foreground">{this.state.error.message}</p>
+        <button
+          type="button"
+          onClick={() => this.setState({ error: null })}
+          className="rounded-md border border-input px-3 py-2 text-sm hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          Reintentar
+        </button>
+      </div>
     )
   }
 }

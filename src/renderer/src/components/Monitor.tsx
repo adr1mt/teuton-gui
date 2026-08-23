@@ -125,7 +125,7 @@ export function MonitorControl() {
       <Button
         variant="outline"
         className="mt-3 w-full border-primary/60"
-        onClick={() => startMonitor(project.dir, monitor.intervalMin)}
+        onClick={() => startMonitor(project.dir, monitor.intervalMin, project.cname)}
       >
         <Radio className="h-4 w-4" /> {t.monitor.start}
       </Button>

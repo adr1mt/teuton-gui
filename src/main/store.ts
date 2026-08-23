@@ -7,9 +7,11 @@ import type {
   DefaultGlobals,
   GradeRecords,
   GradingSettings,
+  PersistenceResult,
   ProjectMeta
 } from '../shared/types'
 import { sanitizeFileName } from '../shared/sanitize'
+import { validatedGrading, validatedRecords } from './validation'
 
 // Persistencia sencilla en JSON dentro de userData.
 
@@ -99,14 +101,15 @@ const DEFAULT_GRADING: GradingSettings = { passScore: 70, maxGrade: 10 }
 
 export async function getGrading(): Promise<GradingSettings> {
   const g = await readJson<Partial<GradingSettings>>('grading.json', DEFAULT_GRADING)
-  return {
-    passScore: typeof g.passScore === 'number' ? g.passScore : DEFAULT_GRADING.passScore,
-    maxGrade: typeof g.maxGrade === 'number' ? g.maxGrade : DEFAULT_GRADING.maxGrade
+  try {
+    return validatedGrading(g)
+  } catch {
+    return { ...DEFAULT_GRADING }
   }
 }
 
 export async function setGrading(grading: GradingSettings): Promise<void> {
-  await writeJson('grading.json', grading)
+  await writeJson('grading.json', validatedGrading(grading))
 }
 
 // ---- Valores globales por defecto ----
@@ -302,26 +305,29 @@ export async function updateRecords(
   dir: string,
   grades: GradeRecords,
   classId?: string
-): Promise<GradeRecords> {
+): Promise<PersistenceResult<GradeRecords>> {
+  const safeGrades = validatedRecords(grades)
   const stored = (await readRecords(dir)) ?? { version: 2, classes: {} }
   const scope = classScope(classId)
   const current = {
     ...(scope === 'manual' ? stored.legacy ?? {} : {}),
     ...(stored.classes[scope] ?? {})
   }
-  for (const [name, grade] of Object.entries(grades)) {
+  for (const [name, grade] of Object.entries(safeGrades)) {
     if (!(name in current) || grade > current[name]) current[name] = grade
   }
   try {
     stored.classes[scope] = current
     await writeAtomic(recordsPath(dir), JSON.stringify(stored, null, 2))
   } catch (err) {
-    // Si el proyecto es de solo lectura, ignoramos -- pero cualquier otro fallo
-    // (disco lleno, permisos) perdería notas de examen en silencio, así que al
-    // menos lo dejamos en el log del proceso main para poder diagnosticarlo.
-    console.error(`updateRecords: no se pudo escribir ${recordsPath(dir)}:`, err)
+    const detail = err instanceof Error ? err.message : String(err)
+    return {
+      data: current,
+      persisted: false,
+      warning: `No se pudo guardar el historial de mejores notas: ${detail}`
+    }
   }
-  return current
+  return { data: current, persisted: true }
 }
 
 /**
@@ -329,10 +335,14 @@ export async function updateRecords(
  * Útil tras una pasada de prueba: sin esto, el récord de la prueba quedaría
  * para siempre como nota mínima en el CSV de Moodle.
  */
-export async function resetRecords(dir: string, classId?: string): Promise<GradeRecords> {
+export async function resetRecords(
+  dir: string,
+  classId?: string
+): Promise<PersistenceResult<GradeRecords>> {
   const stored = await readRecords(dir)
-  if (!stored) return {}
+  if (!stored) return { data: {}, persisted: true }
   const scope = classScope(classId)
+  const previous = { ...(stored.classes[scope] ?? {}) }
   delete stored.classes[scope]
   // El historial legado (formato 1) solo alimenta el espacio manual; si el
   // profesor lo reinicia, debe desaparecer también o reaparecería al leer.
@@ -340,9 +350,14 @@ export async function resetRecords(dir: string, classId?: string): Promise<Grade
   try {
     await writeAtomic(recordsPath(dir), JSON.stringify(stored, null, 2))
   } catch (err) {
-    console.error(`resetRecords: no se pudo escribir ${recordsPath(dir)}:`, err)
+    const detail = err instanceof Error ? err.message : String(err)
+    return {
+      data: previous,
+      persisted: false,
+      warning: `No se pudo borrar el historial de mejores notas: ${detail}`
+    }
   }
-  return {}
+  return { data: {}, persisted: true }
 }
 
 // ---- Metadatos del proyecto (clase activa, etc.) ----
@@ -362,13 +377,7 @@ export async function getProjectMeta(dir: string): Promise<ProjectMeta> {
 
 export async function setProjectMeta(dir: string, meta: ProjectMeta): Promise<void> {
   const current = await getProjectMeta(dir)
-  try {
-    await writeAtomic(metaPath(dir), JSON.stringify({ ...current, ...meta }, null, 2))
-  } catch (err) {
-    // Proyecto de solo lectura: la clase activa vivirá solo en memoria. Otros
-    // fallos (permisos, disco lleno) quedan al menos registrados.
-    console.error(`setProjectMeta: no se pudo escribir ${metaPath(dir)}:`, err)
-  }
+  await writeAtomic(metaPath(dir), JSON.stringify({ ...current, ...meta }, null, 2))
 }
 
 // ---- CSV de Moodle por clase ----

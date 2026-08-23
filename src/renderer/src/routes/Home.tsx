@@ -11,9 +11,15 @@ export default function Home() {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const refresh = () => window.teuton.recentProjects().then(setRecents)
+  const refresh = async () => {
+    try {
+      setRecents(await window.teuton.recentProjects())
+    } catch (cause) {
+      setError(`No se pudieron cargar los proyectos recientes: ${cause instanceof Error ? cause.message : String(cause)}`)
+    }
+  }
   useEffect(() => {
-    refresh()
+    void refresh()
   }, [])
 
   async function openDir(dir: string) {
@@ -28,17 +34,27 @@ export default function Home() {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setBusy(null)
-      refresh()
+      void refresh()
     }
   }
 
   async function handleOpen() {
-    const dir = await window.teuton.pickDirectory()
-    if (dir) await openDir(dir)
+    try {
+      const dir = await window.teuton.pickDirectory()
+      if (dir) await openDir(dir)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause))
+    }
   }
 
   async function handleCreate() {
-    const dir = await window.teuton.pickDirectory()
+    let dir: string | null
+    try {
+      dir = await window.teuton.pickDirectory()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause))
+      return
+    }
     if (!dir) return
     setBusy(dir)
     setError(null)
@@ -50,13 +66,17 @@ export default function Home() {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setBusy(null)
-      refresh()
+      void refresh()
     }
   }
 
   async function removeRecent(e: React.MouseEvent, dir: string) {
     e.stopPropagation()
-    setRecents(await window.teuton.removeRecent(dir))
+    try {
+      setRecents(await window.teuton.removeRecent(dir))
+    } catch (cause) {
+      setError(`No se pudo quitar el proyecto: ${cause instanceof Error ? cause.message : String(cause)}`)
+    }
   }
 
   return (
@@ -81,7 +101,7 @@ export default function Home() {
       <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-10 pt-5">
         <div className="max-w-3xl">
           {error && (
-            <div className="mb-5 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-dense text-destructive-strong">
+            <div role="alert" className="mb-5 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-dense text-destructive-strong">
               {error}
             </div>
           )}
@@ -111,6 +131,7 @@ export default function Home() {
                       <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                     ) : (
                       <button
+                        type="button"
                         onClick={(e) => removeRecent(e, r.dir)}
                         className="rounded-md p-1.5 text-muted-foreground opacity-0 transition-opacity hover:bg-muted focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover:opacity-100"
                         title={t.home.removeRecent}

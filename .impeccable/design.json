@@ -7,7 +7,7 @@
       "signal-blue": {
         "role": "primary",
         "displayName": "Azul Señal",
-        "canonical": "hsl(217 91% 55%)",
+        "canonical": "hsl(217 91% 52%)",
         "dark": "hsl(213 94% 68%)",
         "cssVar": "--primary",
         "tonalRamp": [
@@ -419,9 +419,9 @@
       "name": "View Header",
       "kind": "custom",
       "refersTo": "view-header",
-      "description": "El único spec de cabecera de la app: barra fija de 56px con el título a la izquierda, el contexto justo detrás y los controles al final. Es el único sitio donde vive el título de una vista, y las ocho empiezan igual.",
+      "description": "El único spec de cabecera de la app: barra fija de al menos 56px con el título a la izquierda, el contexto justo detrás y los controles al final. En el ancho mínimo permite wrap y crece sin recortar acciones. Es el único sitio donde vive el título de una vista, y las ocho empiezan igual.",
       "html": "<header class=\"ds-view-header\"><h1 class=\"ds-view-header__title\">Analíticas</h1><span class=\"ds-chip\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M22 10v6M2 10l10-5 10 5-10 5z\"/><path d=\"M6 12v5c3 3 9 3 12 0v-5\"/></svg>SMX2 A</span><span class=\"ds-view-header__meta\">26 alumnos · nota media <strong>3,79</strong> · 7 aprobados</span></header>",
-      "css": ".ds-view-header { display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 24px; border-bottom: 1px solid hsl(var(--border)); background: transparent; font-family: Inter, system-ui, sans-serif; } .ds-view-header__title { margin: 0; font-size: 0.9375rem; font-weight: 600; letter-spacing: -0.01em; color: hsl(var(--foreground)); } .ds-view-header__meta { font-size: 0.75rem; color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums lining-nums; } .ds-view-header__meta strong { color: hsl(var(--foreground)); font-weight: 600; } .ds-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: calc(var(--radius) - 2px); background: hsl(var(--accent)); color: hsl(var(--accent-foreground)); font-size: 0.75rem; font-weight: 500; }"
+      "css": ".ds-view-header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-height: 56px; padding: 8px 24px; border-bottom: 1px solid hsl(var(--border)); background: transparent; font-family: Inter, system-ui, sans-serif; } .ds-view-header__title { margin: 0; font-size: 0.9375rem; font-weight: 600; letter-spacing: -0.01em; color: hsl(var(--foreground)); } .ds-view-header__meta { font-size: 0.75rem; color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums lining-nums; } .ds-view-header__meta strong { color: hsl(var(--foreground)); font-weight: 600; } .ds-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: calc(var(--radius) - 2px); background: hsl(var(--accent)); color: hsl(var(--accent-foreground)); font-size: 0.75rem; font-weight: 500; }"
     },
     {
       "name": "Section Title",
@@ -475,7 +475,7 @@
     "northStar": "El marcador del aula",
     "overview": "Esto es un marcador, no un panel de administración. La pantalla existe para que una persona que está de pie, a tres metros y atendiendo a otro alumno, gire la cabeza y sepa en un segundo quién va bien, quién va a medias y quién está caído. Todo lo demás —editor, ajustes, importar clases— es infraestructura al servicio de ese momento. Cifra grande, glifo de color, y nada compitiendo por la atención alrededor.\n\nLa superficie de trabajo es clara y fría (classroom-white, tarjetas blancas, filetes de 1px), anclada por una barra lateral de tinta oscura que no cambia nunca entre temas: es el marco fijo del marcador. El azul señal se usa con avaricia —navegación activa, foco, un CTA por pantalla— para que el color quede libre y el verde, el ámbar y el rojo signifiquen exclusivamente el estado de un alumno. Cuando en esta interfaz aparece color, es información.\n\nEl sistema ya está tensionado por la proyección: los tokens -strong existen porque el verde y el ámbar puros se quedaban en 2-3:1 sobre superficies teñidas, justo en la nota del alumno y en los chips de la matriz, que es lo que más se ve en el proyector. Esa es la regla de oro del mundo visual: si un valor no aguanta un proyector de aula malo, no entra. Anti-referencia declarada: el cuaderno editorial en papel, con tipografía de lectura y densidad baja. Aquí se escanea, no se lee.",
     "keyCharacteristics": [
-      "Marcador primero: en Resultados, tres lecturas enormes y una fila por alumno con su nombre y su nota a tamaño de proyector. Los controles caben en una barra de 56px.",
+      "Marcador primero: en Resultados, tres lecturas enormes y una fila por alumno con su nombre y su nota a tamaño de proyector. La cabecera mide al menos 56px y crece si las acciones necesitan una segunda línea.",
       "Lateral de tinta fija + lienzo claro; el contraste de zonas orienta antes que el texto.",
       "Color semántico y racionado: azul = sistema, verde/ámbar/rojo = alumno.",
       "Densidad de instrumento: cuerpo base de 14px y cero aire decorativo, con la escala grande reservada a lo que se lee a tres metros.",

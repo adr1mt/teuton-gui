@@ -114,6 +114,9 @@ export interface ResumeReport {
 export interface LoadedResults {
   testName: string
   outputDir: string
+  /** Clase que produjo estos resultados; viaja con el dato, no con la vista activa. */
+  classId?: string | null
+  className?: string | null
   resume: ResumeReport | null
   cases: CaseReport[]
   moodleCsv: string | null
@@ -178,6 +181,13 @@ export interface ClassRoster {
 /** Récord histórico de mejor nota (0-100) por alumno, por proyecto. */
 export type GradeRecords = Record<string, number>
 
+/** Resultado de una escritura que puede degradarse sin perder el dato en memoria. */
+export interface PersistenceResult<T> {
+  data: T
+  persisted: boolean
+  warning?: string
+}
+
 /** Metadatos del proyecto que la GUI recuerda entre sesiones. */
 export interface ProjectMeta {
   /** ID estable de la clase importada por última vez en este proyecto. */
@@ -191,6 +201,8 @@ export interface ProjectMeta {
    * anteriores a esta versión.
    */
   lastRunClassId?: string | null
+  /** Nombre congelado junto al ID para rotular/exportar resultados antiguos correctamente. */
+  lastRunClassName?: string | null
 }
 
 /** API expuesta por el preload en window.teuton. */
@@ -208,7 +220,7 @@ export interface TeutonApi {
   openProject: (dir: string, cname?: string) => Promise<ProjectFiles>
   saveProject: (files: Pick<ProjectFiles, 'dir' | 'scriptFile' | 'configFile' | 'script' | 'config'>) => Promise<void>
   check: (dir: string, cname?: string) => Promise<CheckResult>
-  run: (dir: string, options: RunOptions) => Promise<RunHandle>
+  run: (dir: string, options: RunOptions, runId: string) => Promise<RunHandle>
   cancelRun: (runId: string) => Promise<void>
   onRunEvent: (cb: (event: RunEvent) => void) => () => void
   loadResults: (dir: string, testName?: string) => Promise<LoadedResults>
@@ -216,7 +228,8 @@ export interface TeutonApi {
   saveFileDialog: (defaultName: string, content: string) => Promise<string | null>
   recentProjects: () => Promise<RecentProject[]>
   removeRecent: (dir: string) => Promise<RecentProject[]>
-  openPath: (target: string) => Promise<void>
+  /** Cadena vacía si se abrió correctamente; mensaje del sistema si falló. */
+  openPath: (target: string) => Promise<string>
   openExternal: (url: string) => Promise<void>
 
   // Ajustes de nota (globales)
@@ -235,9 +248,9 @@ export interface TeutonApi {
   // Récord histórico de notas por proyecto
   /** Los récords se aíslan por clase para que dos grupos del mismo examen no se mezclen. */
   getRecords: (dir: string, classId?: string) => Promise<GradeRecords>
-  updateRecords: (dir: string, grades: GradeRecords, classId?: string) => Promise<GradeRecords>
+  updateRecords: (dir: string, grades: GradeRecords, classId?: string) => Promise<PersistenceResult<GradeRecords>>
   /** Borra el historial de mejores notas de la clase indicada (o del espacio manual). */
-  resetRecords: (dir: string, classId?: string) => Promise<GradeRecords>
+  resetRecords: (dir: string, classId?: string) => Promise<PersistenceResult<GradeRecords>>
 
   // Metadatos del proyecto (clase activa, etc.)
   getProjectMeta: (dir: string) => Promise<ProjectMeta>
