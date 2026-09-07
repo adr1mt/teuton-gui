@@ -24,9 +24,9 @@ he sees on screen during an exam. Explain in those terms, not in code terms.
    from a terminal, so an un-reinstalled change is invisible: he would be testing the previous build
    without knowing it. The menu entry (`~/.local/share/applications/teuton-gui.desktop`) points at
    `/mnt/datos/Aplicaciones/TeutonGUI/TeutonGUI.AppImage`, not at `launch.sh`.
-3. **Update `docs/HANDOFF.md`** for anything feature-level, in the *same* commit — it is the project's
-   memory between sessions (what exists, what's pending, what was decided and why). Typo fixes and trivial
-   refactors need no entry; anything that changes behaviour, the UI or a decision does.
+3. **Update `docs/HANDOFF.md`** in the *same* commit if the change moves the current state — objective,
+   what is in progress, what is next. It holds 30-60 lines of live state, not history: drop whatever is
+   no longer needed to resume work. History lives in `git log` and the GitHub releases.
 
 **Nothing large goes on `/`** — that partition is ~96 % full. The executable lives under `/mnt/datos`, and
 any bulky file the app generates must default there too (Teutón's reports already land next to the
@@ -234,7 +234,7 @@ telemetry, don't log config values, and keep anything bulky or personal out of `
 
 | File | Holds |
 |---|---|
-| `docs/HANDOFF.md` | **State**: what exists, what's pending, what was decided. Update it with every feature change. |
+| `docs/HANDOFF.md` | **Current state**: objective, in progress, next step. 30-60 lines, no history. |
 | `docs/DESIGN.md` | UI/UX decisions and the visual system |
 | `docs/PRODUCT.md` | What the app is for, and for whom |
 | `README.md` | Install and first run, for anyone who is not Claude |

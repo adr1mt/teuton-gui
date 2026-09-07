@@ -144,6 +144,25 @@ node /tmp/verify.mjs <ruta/proyecto/ya/ejecutado>
 
 `scripts/screenshot.ts` es un smoke test visual que arranca la app y captura una imagen.
 
+## Proyecto de demostración
+
+Para ver la pantalla con datos realistas sin montar máquinas virtuales, abre en Inicio
+la carpeta `sandbox/examen-demo/`. Es un cuestionario de 10 preguntas de redes con 15
+alumnos inventados. No usa SSH: cada comprobación compara en local la respuesta que el
+alumno lleva en su ficha. La clase **DEMO-15** ya está guardada en Clases y el proyecto
+la tiene como clase activa.
+
+Las notas están repartidas a propósito para ver la pantalla en todos sus estados
+(escala del profesor, con el aprobado en 70 puntos): cuatro **10,00**, tres **8,33**,
+dos **6,67**, dos justo en el **5,00** y cuatro suspensos (**3,57**, **3,57**, **2,14**
+y **0,71**). Salen **11 aprobados de 15**, media **5,67**.
+
+Para rehacerla desde cero (o cambiar las notas: se editan en la tabla `ROSTER`):
+
+```bash
+node scripts/make-demo-project.mjs
+```
+
 ## Licencia
 
 [MPL-2.0](LICENSE) — igual que Teutón.
