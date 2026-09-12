@@ -9,3 +9,7 @@ var/
 # Proyectos de prueba locales del profesor (no forman parte de la GUI)
 sandbox/
 .teuton-gui-records.json
+
+# Playwright output
+test-results/
+playwright-report/
