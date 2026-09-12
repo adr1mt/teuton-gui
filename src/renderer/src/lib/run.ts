@@ -42,7 +42,16 @@ export async function startRun(dir: string, options: RunOptions): Promise<void> 
   // Nunca dos `teuton run` a la vez sobre el mismo var/<test>/: ambos abren los
   // case-NN.json en modo truncado y el que escribe menos bytes deja la cola del
   // otro detrás, produciendo un JSON corrupto (JSON válido + basura).
-  if (useApp.getState().run.status === 'running') return
+  //
+  // Ceder el turno NO puede romper la cadena del modo examen: el ciclo que
+  // llamó aquí ya consumió su temporizador, así que sin reprogramar el monitor
+  // se quedaría «activo» sin ninguna ejecución pendiente y la clase dejaría de
+  // corregirse sin avisar. Pasa de verdad al reevaluar a un alumno justo cuando
+  // vence el intervalo.
+  if (useApp.getState().run.status === 'running') {
+    if (useApp.getState().monitor.active) scheduleNextCycle(dir)
+    return
+  }
   try {
     await saveDraftsIfDirty()
   } catch (e) {
@@ -158,6 +167,36 @@ export async function cancelRun(): Promise<void> {
 }
 
 /**
+ * Deja el proyecto actual en un estado limpio antes de abrir otro o cerrarlo.
+ *
+ * El store resetea `run` y `monitor` al cambiar de proyecto, pero eso solo
+ * olvida el proceso: el `teuton run` sigue vivo en main evaluando a la clase
+ * anterior, sus eventos se descartan por `runId` (así que ni resultados ni
+ * récords se guardan) y main rechaza la siguiente ejecución sobre ese
+ * directorio con «Ya hay una evaluación activa». Hay que cancelarlo de verdad
+ * y parar el temporizador del modo examen, que vive en este módulo.
+ */
+export async function leaveProject(): Promise<void> {
+  stopMonitor()
+  const runId = useApp.getState().run.runId
+  if (!runId) return
+  try {
+    await window.teuton.cancelRun(runId)
+  } catch (error) {
+    useApp.getState().setOperationalError(
+      `No se pudo detener la evaluación anterior: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+  useApp.getState().setRun({ status: 'idle', runId: null })
+}
+
+/** ¿Hay una evaluación o un modo examen en marcha ahora mismo? */
+export function isExamInProgress(): boolean {
+  const st = useApp.getState()
+  return st.run.status === 'running' || st.monitor.active
+}
+
+/**
  * Recarga de disco los últimos resultados y actualiza el récord de la clase
  * que PRODUJO esa ejecución (guardada en los metadatos del proyecto), no la
  * activa ahora: ejecutar con el grupo A, cambiar al B y recargar no debe
@@ -229,21 +268,69 @@ function clearMonitorTimer(): void {
   }
 }
 
+/** Minutos de intervalo saneados: entero y con techo, para que `setTimeout` no
+ * desborde el int32 y dispare de inmediato en bucle (a partir de ~35 791 min). */
+function intervalMs(intervalMin: number): number {
+  const minutes = Number.isFinite(intervalMin) ? Math.floor(intervalMin) : 1
+  return Math.min(Math.max(1, minutes), 24 * 60) * 60_000
+}
+
 /** Programa el siguiente ciclo tras terminar el actual (encadenado, sin solapes). */
 function scheduleNextCycle(dir: string): void {
   const { monitor } = useApp.getState()
   if (!monitor.active) return
-  const intervalMs = Math.max(1, monitor.intervalMin) * 60_000
-  const nextRunAt = Date.now() + intervalMs
-  useApp.getState().setMonitor({ nextRunAt })
+  const delay = intervalMs(monitor.intervalMin)
+  useApp.getState().setMonitor({ nextRunAt: Date.now() + delay })
   clearMonitorTimer()
-  monitorTimer = setTimeout(() => {
-    const st = useApp.getState()
-    if (st.monitor.active && st.project?.dir === dir) {
-      st.setMonitor({ nextRunAt: null, cycles: st.monitor.cycles + 1 })
-      void startRun(dir, { cname: st.project.cname })
-    }
-  }, intervalMs)
+  monitorTimer = setTimeout(() => runCycle(dir), delay)
+}
+
+/**
+ * Arranca un ciclo del modo examen. Si el proyecto ya no es el que se estaba
+ * evaluando, para el monitor y lo dice: dejarlo «activo» sin temporizador es
+ * peor que pararlo, porque el panel seguiría prometiendo ciclos que no llegan.
+ */
+function runCycle(dir: string): void {
+  const st = useApp.getState()
+  if (!st.monitor.active) return
+  if (st.project?.dir !== dir) {
+    stopMonitor()
+    st.setOperationalError('El modo examen se ha detenido: el proyecto que se estaba evaluando ya no está abierto.')
+    return
+  }
+  st.setMonitor({ nextRunAt: null, cycles: st.monitor.cycles + 1 })
+  void startRun(dir, { cname: st.project.cname })
+}
+
+/**
+ * Vigilante del modo examen. La invariante es «monitor activo ⇒ hay un ciclo
+ * programado», y hay formas de perderla que no dependen del código: un `ssh`
+ * colgado que nunca emite `exit` (el ciclo no termina y nadie reprograma), o
+ * suspender el portátil, donde el temporizador no corre y el contador se queda
+ * clavado en 0:00. Sin esto la clase deja de corregirse y la pantalla sigue
+ * diciendo «activo».
+ */
+const WATCHDOG_INTERVAL_MS = 30_000
+const WATCHDOG_GRACE_MS = 60_000
+let processingExit = false
+
+export function checkMonitorHealth(now = Date.now()): boolean {
+  const st = useApp.getState()
+  if (!st.monitor.active) return false
+  // Un ciclo en curso (proceso vivo o resultados cargándose) no es un parón.
+  if (st.run.status === 'running' || processingExit) return false
+  const dir = st.project?.dir
+  if (!dir) {
+    stopMonitor()
+    st.setOperationalError('El modo examen se ha detenido: no hay ningún proyecto abierto.')
+    return true
+  }
+  const overdue = st.monitor.nextRunAt !== null && st.monitor.nextRunAt < now - WATCHDOG_GRACE_MS
+  if (monitorTimer !== null && !overdue) return false
+  st.setOperationalError('El modo examen se había quedado parado; se reanuda ahora.')
+  clearMonitorTimer()
+  runCycle(dir)
+  return true
 }
 
 /**
@@ -253,7 +340,11 @@ function scheduleNextCycle(dir: string): void {
 export function useRunManager(): void {
   useEffect(() => {
     const unsub = window.teuton.onRunEvent(handleRunEvent)
-    return unsub
+    const watchdog = setInterval(() => checkMonitorHealth(), WATCHDOG_INTERVAL_MS)
+    return () => {
+      unsub()
+      clearInterval(watchdog)
+    }
   }, [])
 }
 
@@ -295,6 +386,7 @@ async function loadAfterExit(
   context: { projectDir: string | null; classId: string | null; className: string | null }
 ): Promise<void> {
   if (!context.projectDir) return
+  processingExit = true
   const isCurrentContext = () => {
     const current = useApp.getState()
     return current.project?.dir === context.projectDir && current.activeClassId === context.classId
@@ -356,6 +448,7 @@ async function loadAfterExit(
     const message = error instanceof Error ? error.message : String(error)
     useApp.getState().setOperationalError(`No se pudo completar el procesamiento de resultados: ${message}`)
   } finally {
+    processingExit = false
     if (isCurrentContext()) useApp.getState().setLoadingResults(false)
     // Si el modo examen sigue activo, encadena el siguiente ciclo.
     if (useApp.getState().monitor.active) scheduleNextCycle(context.projectDir)

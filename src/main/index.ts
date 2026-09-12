@@ -1,6 +1,6 @@
-import { app, BrowserWindow, session, shell } from 'electron'
+import { app, BrowserWindow, dialog, session, shell } from 'electron'
 import { join } from 'node:path'
-import { registerIpc, stopActiveRuns } from './ipc'
+import { hasActiveRuns, registerIpc, stopActiveRuns } from './ipc'
 
 // Evita cuelgues de compositor/GPU habituales en Linux (causa típica de
 // "la ventana no responde"). La app es ligera y no necesita aceleración HW.
@@ -65,6 +65,28 @@ function createWindow(): void {
 
   win.on('ready-to-show', () => win.show())
 
+  // Cerrar la ventana a mitad de examen mata la corrección de toda la clase, así
+  // que se pregunta. Se decide en main y no en el renderer para que el aviso
+  // aparezca incluso si la interfaz se ha quedado atascada.
+  let closeConfirmed = false
+  win.on('close', (event) => {
+    if (closeConfirmed || !hasActiveRuns()) return
+    event.preventDefault()
+    const choice = dialog.showMessageBoxSync(win, {
+      type: 'warning',
+      buttons: ['Seguir corrigiendo', 'Cerrar y detener'],
+      defaultId: 0,
+      cancelId: 0,
+      title: 'Hay una corrección en marcha',
+      message: 'Hay una evaluación en curso.',
+      detail: 'Si cierras ahora se detendrá la corrección de la clase. Las notas ya guardadas se conservan.'
+    })
+    if (choice === 1) {
+      closeConfirmed = true
+      win.close()
+    }
+  })
+
   // Abre enlaces externos en el navegador del sistema, solo esquemas seguros.
   const isSafeExternal = (url: string): boolean => /^(https?|mailto):/i.test(url)
 
@@ -105,3 +127,24 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', stopActiveRuns)
+
+// Cerrar la sesión del escritorio o un `kill` no disparan 'before-quit', así que
+// sin esto los `teuton`/`ssh` lanzados quedan vivos tras apagar el ordenador.
+for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP'] as const) {
+  process.on(signal, () => {
+    stopActiveRuns()
+    app.quit()
+  })
+}
+
+/**
+ * Red de seguridad: un error asíncrono sin capturar mataba el proceso main a
+ * mitad de examen, y con él la corrección de toda la clase. Se registra y se
+ * sigue: perder una operación es mucho menos grave que perder la sesión.
+ */
+process.on('uncaughtException', (error) => {
+  console.error('[teuton-gui] excepción no capturada:', error)
+})
+process.on('unhandledRejection', (reason) => {
+  console.error('[teuton-gui] promesa rechazada sin capturar:', reason)
+})

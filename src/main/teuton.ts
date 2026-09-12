@@ -1,4 +1,5 @@
 import { spawn, execFile } from 'node:child_process'
+import type { ExecFileOptionsWithStringEncoding } from 'node:child_process'
 import { promisify } from 'node:util'
 import { basename, join, delimiter, isAbsolute } from 'node:path'
 import { readdirSync, existsSync, constants } from 'node:fs'
@@ -213,11 +214,18 @@ export interface CliResult {
   code: number | null
 }
 
-/** Ejecuta un subcomando de teuton y espera a que termine (para comandos cortos). */
+/**
+ * Ejecuta un subcomando de teuton y espera a que termine (para comandos cortos).
+ *
+ * `onChild` permite a quien llama registrar el hijo para poder matarlo al salir
+ * de la app: el `timeout` de `execFile` solo alcanza al proceso lanzador, así que
+ * sin grupo propio y sin registro los `ruby`/`ssh` nietos quedan huérfanos.
+ */
 export async function runTeutonSync(
   args: string[],
   cwd: string,
-  timeout = 60000
+  timeout = 60000,
+  onChild?: (child: ReturnType<typeof execFile>) => void
 ): Promise<CliResult> {
   const path = await resolveTeuton()
   if (!path) {
@@ -225,13 +233,34 @@ export async function runTeutonSync(
   }
   const env = await teutonEnv()
   return new Promise((resolve) => {
-    execFile(path, args, { cwd, env, timeout, maxBuffer: 1024 * 1024 * 32 }, (err, stdout, stderr) => {
-      resolve({
-        stdout: stdout ?? '',
-        stderr: stderr ?? '',
-        code: err && typeof (err as { code?: number }).code === 'number' ? (err as { code: number }).code : err ? 1 : 0
-      })
-    })
+    // `detached` no está en los tipos de execFile pero sí se pasa a spawn: hace
+    // falta para que el grupo de procesos sea propio y cancelar alcance a los
+    // `ruby`/`ssh` nietos, no solo al lanzador.
+    const options = {
+      cwd,
+      env,
+      timeout,
+      maxBuffer: 1024 * 1024 * 32,
+      encoding: 'utf8',
+      detached: process.platform !== 'win32'
+    } as ExecFileOptionsWithStringEncoding
+    const child = execFile(
+      path,
+      args,
+      options,
+      (err, stdout, stderr) => {
+        const code = err && typeof (err as { code?: number }).code === 'number' ? (err as { code: number }).code : err ? 1 : 0
+        // `err.code` no numérico ('ETIMEDOUT', 'ENOENT', maxBuffer excedido) se
+        // colapsaba a 1 sin más: al menos deja el motivo en stderr.
+        const reason = err && typeof (err as { code?: unknown }).code === 'string' ? `[${(err as { code: string }).code}] ${err.message}` : ''
+        resolve({
+          stdout: stdout ?? '',
+          stderr: [stderr ?? '', reason].filter(Boolean).join('\n'),
+          code
+        })
+      }
+    )
+    onChild?.(child)
   })
 }
 

@@ -42,7 +42,27 @@ import {
   validatedText
 } from './validation'
 
-const activeRuns = new Map<string, { child: ChildProcess; dir: string }>()
+interface ActiveRun {
+  child: ChildProcess
+  dir: string
+  cancelling: boolean
+}
+
+const activeRuns = new Map<string, ActiveRun>()
+
+/**
+ * Directorios con una evaluación reservada. Se reserva ANTES de lanzar el
+ * proceso (no después): comprobar el registro y luego `await spawnRun` deja un
+ * hueco en el que dos peticiones arrancan dos `teuton run` sobre el mismo
+ * `var/<test>/`, que es exactamente la escritura entrelazada que corrompe los
+ * `case-NN.json` y por la que existe el rescate de `results.ts`.
+ */
+const busyDirs = new Set<string>()
+
+function reserveDir(dir: string): void {
+  if (busyDirs.has(dir)) throw new Error('Ya hay una evaluación activa para este proyecto.')
+  busyDirs.add(dir)
+}
 const EXPORT_FORMATS = new Set<ExportFormat>(['txt', 'html', 'yaml', 'json', 'xml', 'markdown', 'colored_text'])
 
 function projectDir(value: unknown): string {
@@ -149,15 +169,78 @@ function cancelProcess(child: ChildProcess, options: { immediate?: boolean } = {
   child.once('close', cancelTimer)
 }
 
+/**
+ * Hijos de `runTeutonSync` (check / export). Se registran aquí porque el timeout
+ * de `execFile` solo mata al proceso directo, no al grupo: sin esto, salir de la
+ * app durante un export deja vivos el `ruby` y los `ssh` a las máquinas de los
+ * alumnos, y `stopActiveRuns()` no puede alcanzarlos.
+ */
+const syncChildren = new Set<ChildProcess>()
+
+function trackChild(child: ChildProcess): void {
+  syncChildren.add(child)
+  const forget = (): void => {
+    syncChildren.delete(child)
+  }
+  child.once('close', forget)
+  child.once('error', forget)
+  child.stdout?.on('error', () => undefined)
+  child.stderr?.on('error', () => undefined)
+}
+
+const CANCEL_WAIT_MS = 10_000
+
+/**
+ * Cancela y espera a que el proceso muera de verdad antes de resolver. El
+ * renderer espera este await para volver a habilitar «Ejecutar»: si se
+ * resolviera al enviar SIGTERM, cancelar y relanzar acto seguido pondría dos
+ * procesos a escribir en el mismo `var/<test>/` durante los 3 s de escalada.
+ */
+function cancelAndWait(entry: ActiveRun): Promise<void> {
+  entry.cancelling = true
+  const { child } = entry
+  if (!isAlive(child)) return Promise.resolve()
+  return new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error('La evaluación no se ha detenido todavía; espera unos segundos antes de volver a ejecutar.'))
+    }, CANCEL_WAIT_MS)
+    child.once('close', () => {
+      clearTimeout(timer)
+      resolve()
+    })
+    cancelProcess(child)
+  })
+}
+
 /** Detiene los procesos de evaluación al salir de la aplicación. */
 export function stopActiveRuns(): void {
   for (const { child } of activeRuns.values()) cancelProcess(child, { immediate: true })
+  for (const child of syncChildren) cancelProcess(child, { immediate: true })
   activeRuns.clear()
+  syncChildren.clear()
+  busyDirs.clear()
+}
+
+/** ¿Hay alguna evaluación viva? Lo consulta el aviso al cerrar la ventana. */
+export function hasActiveRuns(): boolean {
+  return (
+    [...activeRuns.values()].some(({ child }) => isAlive(child)) ||
+    [...syncChildren].some(isAlive)
+  )
 }
 
 function broadcast(event: RunEvent): void {
+  // Se llama desde callbacks asíncronos del hijo: una ventana cerrada entre la
+  // enumeración y el envío lanzaría «Object has been destroyed» fuera de todo
+  // try/catch y tiraría el proceso main a mitad de examen.
   for (const win of BrowserWindow.getAllWindows()) {
-    win.webContents.send(IPC.runEvent, event)
+    try {
+      if (!win.isDestroyed() && !win.webContents.isDestroyed()) {
+        win.webContents.send(IPC.runEvent, event)
+      }
+    } catch {
+      // Ventana cerrándose: no hay a quién avisar y no es un error.
+    }
   }
 }
 
@@ -201,7 +284,7 @@ export function registerIpc(): void {
     const args = ['check']
     if (safeCname) args.push(`--cname=${safeCname}`)
     args.push('.')
-    const res = await runTeutonSync(args, safeDir, 30000)
+    const res = await runTeutonSync(args, safeDir, 30000, trackChild)
     return {
       ok: res.code === 0,
       output: [res.stdout, res.stderr].filter(Boolean).join('\n'),
@@ -212,11 +295,26 @@ export function registerIpc(): void {
   handle(IPC.runStart, async (_e, dir, options, requestedRunId) => {
     const safeDir = projectDir(dir)
     const runId = runIdentifier(requestedRunId)
-    if ([...activeRuns.values()].some((run) => run.dir === safeDir && isAlive(run.child))) {
-      throw new Error('Ya hay una evaluación activa para este proyecto.')
+    const safeOptions = runOptions(options)
+    if (activeRuns.has(runId)) throw new Error('Ese identificador de ejecución ya está en uso.')
+    reserveDir(safeDir)
+    let child: ChildProcess
+    let testName: string
+    try {
+      ;({ child, testName } = await spawnRun(safeDir, safeOptions))
+    } catch (error) {
+      busyDirs.delete(safeDir)
+      throw error
     }
-    const { child, testName } = await spawnRun(safeDir, runOptions(options))
-    activeRuns.set(runId, { child, dir: safeDir })
+    activeRuns.set(runId, { child, dir: safeDir, cancelling: false })
+
+    // Libera solo si la entrada sigue siendo ESTE hijo: borrar a ciegas dejaría
+    // fuera del registro a otra ejecución viva, que ya no se podría cancelar ni
+    // matar al salir de la app.
+    const release = (): void => {
+      if (activeRuns.get(runId)?.child === child) activeRuns.delete(runId)
+      busyDirs.delete(safeDir)
+    }
 
     child.stdout?.on('data', (d: Buffer) =>
       broadcast({ runId, type: 'stdout', data: d.toString() })
@@ -224,25 +322,26 @@ export function registerIpc(): void {
     child.stderr?.on('data', (d: Buffer) =>
       broadcast({ runId, type: 'stderr', data: d.toString() })
     )
+    // Un EIO/EPIPE en la tubería sin oyente de 'error' lanza desde el
+    // EventEmitter y mata el proceso main.
+    child.stdout?.on('error', () => undefined)
+    child.stderr?.on('error', () => undefined)
     child.on('error', (err) => {
-      activeRuns.delete(runId)
+      release()
       broadcast({ runId, type: 'error', message: err.message })
     })
     child.on('close', (code) => {
-      activeRuns.delete(runId)
+      release()
       broadcast({ runId, type: 'exit', code, testName })
     })
 
     return { runId }
   })
 
-  handle(IPC.runCancel, (_e, value) => {
+  handle(IPC.runCancel, async (_e, value) => {
     const runId = runIdentifier(value)
     const active = activeRuns.get(runId)
-    if (active) {
-      cancelProcess(active.child)
-      activeRuns.delete(runId)
-    }
+    if (active) await cancelAndWait(active)
   })
 
   handle(IPC.loadResults, (_e, dir, testName) =>
@@ -251,11 +350,19 @@ export function registerIpc(): void {
 
   handle(IPC.exportAs, async (_e, dir, format) => {
     if (!EXPORT_FORMATS.has(format as ExportFormat)) throw new Error('El formato de exportación no es válido.')
-    const res = await runTeutonSync(['run', `--export=${format}`, '.'], projectDir(dir), 120000)
-    return {
-      ok: res.code === 0,
-      output: [res.stdout, res.stderr].filter(Boolean).join('\n'),
-      exitCode: res.code
+    const safeDir = projectDir(dir)
+    // `teuton run --export` es una ejecución completa: reescribe var/<test>/ y
+    // por tanto compite con una evaluación en curso. Misma reserva que runStart.
+    reserveDir(safeDir)
+    try {
+      const res = await runTeutonSync(['run', `--export=${format}`, '.'], safeDir, 120000, trackChild)
+      return {
+        ok: res.code === 0,
+        output: [res.stdout, res.stderr].filter(Boolean).join('\n'),
+        exitCode: res.code
+      }
+    } finally {
+      busyDirs.delete(safeDir)
     }
   })
 

@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { FolderOpen, Plus, X, Loader2 } from 'lucide-react'
 import { useApp } from '../stores/app'
 import { t } from '../i18n/es'
-import { Button, SectionTitle, ViewHeader } from '../components/ui'
+import { Button, ConfirmDialog, SectionTitle, ViewHeader } from '../components/ui'
+import { isExamInProgress, leaveProject } from '../lib/run'
 import type { RecentProject } from '../../../shared/types'
 
 export default function Home() {
@@ -10,6 +11,9 @@ export default function Home() {
   const [recents, setRecents] = useState<RecentProject[]>([])
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Abrir otro proyecto con un examen en marcha aborta la corrección de la clase
+  // actual, así que se pregunta antes. `pending` guarda qué se iba a hacer.
+  const [pending, setPending] = useState<{ dir: string; create: boolean } | null>(null)
 
   const refresh = async () => {
     try {
@@ -26,6 +30,7 @@ export default function Home() {
     setBusy(dir)
     setError(null)
     try {
+      await leaveProject()
       const files = await window.teuton.openProject(dir)
       // App.tsx carga récords y clase activa al detectar el cambio de proyecto.
       setProject(files)
@@ -38,10 +43,19 @@ export default function Home() {
     }
   }
 
+  /** Abre (o crea) pidiendo confirmación si hay una corrección en marcha. */
+  async function guard(dir: string, create: boolean) {
+    if (isExamInProgress()) {
+      setPending({ dir, create })
+      return
+    }
+    await (create ? createDir(dir) : openDir(dir))
+  }
+
   async function handleOpen() {
     try {
       const dir = await window.teuton.pickDirectory()
-      if (dir) await openDir(dir)
+      if (dir) await guard(dir, false)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause))
     }
@@ -56,9 +70,14 @@ export default function Home() {
       return
     }
     if (!dir) return
+    await guard(dir, true)
+  }
+
+  async function createDir(dir: string) {
     setBusy(dir)
     setError(null)
     try {
+      await leaveProject()
       const files = await window.teuton.createProject(dir)
       setProject(files)
       setView('editor')
@@ -115,7 +134,7 @@ export default function Home() {
               {recents.map((r) => (
                 <li key={r.dir} className="group relative border-b border-border/70">
                   <button
-                    onClick={() => openDir(r.dir)}
+                    onClick={() => void guard(r.dir, false)}
                     className="flex w-full items-center gap-3 rounded-md py-3 pl-2 pr-10 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                   >
                     <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -147,6 +166,22 @@ export default function Home() {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={pending !== null}
+        title="Hay una corrección en marcha"
+        confirmLabel="Abrir de todas formas"
+        destructive
+        onCancel={() => setPending(null)}
+        onConfirm={() => {
+          const target = pending
+          setPending(null)
+          if (target) void (target.create ? createDir(target.dir) : openDir(target.dir))
+        }}
+      >
+        Si abres otro proyecto ahora se detendrá la evaluación de la clase actual y el modo examen.
+        Las notas ya guardadas se conservan.
+      </ConfirmDialog>
     </div>
   )
 }
