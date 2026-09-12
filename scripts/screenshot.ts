@@ -16,7 +16,10 @@ app.whenReady().then(async () => {
     show: true,
     backgroundColor: '#0b0f19',
     webPreferences: {
-      preload: join(root, 'out/preload/index.mjs'),
+      // El build emite CommonJS (lo exige el preload con sandbox); apuntar al
+      // .mjs cargaba un fichero inexistente y el renderer se quedaba sin
+      // window.teuton, así que la captura salía vacía.
+      preload: join(root, 'out/preload/index.cjs'),
       sandbox: false,
       contextIsolation: true,
       nodeIntegration: false

@@ -15,7 +15,7 @@ vi.mock('electron', () => ({
   }
 }))
 
-import { getProjectMeta, getRecords, setProjectMeta, updateRecords } from '../src/main/store'
+import { deleteClass, getProjectMeta, getRecords, listClasses, saveClass, setProjectMeta, updateRecords } from '../src/main/store'
 import { validatedMeta } from '../src/main/validation'
 
 const temporary: string[] = []
@@ -108,5 +108,54 @@ describe('un fichero ilegible no puede borrar datos', () => {
 
     expect(await getRecords(dir, 'clase-a')).toEqual({ Ana: 80 })
     expect(await getRecords(dir, 'clase-b')).toEqual({ Bruno: 60 })
+  })
+})
+
+describe('las clases guardadas no pueden desaparecer', () => {
+  const roster = (id: string, name: string) => ({
+    id,
+    name,
+    students: [{ name: 'Ana Ferrer' }],
+    createdAt: 0,
+    updatedAt: 0
+  })
+
+  it('un classes.json sin permisos de lectura da error, no una lista vacía', async () => {
+    runtime.userData = join(tmpdir(), `teuton-classes-${randomUUID()}`)
+    temporary.push(runtime.userData)
+    await fs.mkdir(runtime.userData, { recursive: true })
+    await saveClass(roster('c1', 'SMX2A'))
+    const file = join(runtime.userData, 'classes.json')
+    const original = await fs.readFile(file, 'utf-8')
+    await fs.chmod(file, 0o000)
+
+    try {
+      // Devolver [] aquí era pérdida total: parecía «no hay clases» y el
+      // siguiente guardado reescribía el fichero sin los grupos anteriores.
+      await expect(listClasses()).rejects.toThrow(/No se pudo leer/)
+      await expect(saveClass(roster('c2', 'SMX2B'))).rejects.toThrow(/No se pudo leer/)
+      await expect(deleteClass('c1')).rejects.toThrow(/No se pudo leer/)
+    } finally {
+      await fs.chmod(file, 0o600)
+    }
+
+    expect(await fs.readFile(file, 'utf-8')).toBe(original)
+    expect((await listClasses()).map((c) => c.name)).toEqual(['SMX2A'])
+  })
+
+  it('aguanta una clase de 300 alumnos y dos guardados a la vez', async () => {
+    runtime.userData = join(tmpdir(), `teuton-classes-${randomUUID()}`)
+    temporary.push(runtime.userData)
+    await fs.mkdir(runtime.userData, { recursive: true })
+    const big = {
+      ...roster('grande', 'SMX-300'),
+      students: Array.from({ length: 300 }, (_, i) => ({ name: `Alumno ${i + 1}` }))
+    }
+
+    await Promise.all([saveClass(big), saveClass(roster('otra', 'SMX2C'))])
+
+    const list = await listClasses()
+    expect(list.map((c) => c.id).sort()).toEqual(['grande', 'otra'])
+    expect(list.find((c) => c.id === 'grande')!.students).toHaveLength(300)
   })
 })

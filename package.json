@@ -29,7 +29,9 @@
     "verify:preload": "node scripts/verify-preload.mjs",
     "dist": "npm run build && electron-builder",
     "dist:linux": "npm run build && electron-builder --linux AppImage deb",
-    "icon": "python3 scripts/make-icon.py"
+    "icon": "python3 scripts/make-icon.py",
+    "test:e2e": "playwright test",
+    "screenshot": "esbuild scripts/screenshot.ts --bundle --platform=node --format=esm --outfile=/tmp/teuton-shot.mjs --external:electron && node_modules/electron/dist/electron /tmp/teuton-shot.mjs --no-sandbox"
   },
   "build": {
     "appId": "net.xeill.elpuig.teutongui",
@@ -74,6 +76,7 @@
   },
   "devDependencies": {
     "@monaco-editor/react": "^4.6.0",
+    "@playwright/test": "^1.63.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.20.1",
     "@types/react": "^18.3.3",

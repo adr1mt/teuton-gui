@@ -138,3 +138,65 @@ describe('loadResults', () => {
     expect(res.cases[0].groups[0].targets).toHaveLength(1)
   })
 })
+
+describe('informes hostiles', () => {
+  it('aguanta 300 alumnos sin perder a ninguno', async () => {
+    dir = await makeProjectDir()
+    const cases = Array.from({ length: 300 }, (_, i) => ({
+      id: String(i + 1).padStart(2, '0'),
+      members: `Alumno ${i + 1}`,
+      grade: (i % 11) * 10
+    }))
+    const files: Record<string, string> = {
+      'resume.json': JSON.stringify(resumeJson(cases))
+    }
+    for (const c of cases) {
+      files[`case-${c.id}.json`] = JSON.stringify(caseJson(c.members, c.grade, [{ id: '01', check: true }]))
+    }
+    await writeOutput(dir, 'grande', files)
+
+    const loaded = await loadResults(dir, 'grande')
+
+    expect(loaded.resume?.cases).toHaveLength(300)
+    expect(loaded.cases).toHaveLength(300)
+  })
+
+  it('un case-NN.json que es un array no se lleva por delante a los demás', async () => {
+    dir = await makeProjectDir()
+    await writeOutput(dir, 'raro', {
+      'resume.json': JSON.stringify(
+        resumeJson([
+          { id: '01', members: 'Ana', grade: 100 },
+          { id: '02', members: 'Bruno', grade: 50 }
+        ])
+      ),
+      'case-01.json': '[1,2,3]',
+      'case-02.json': JSON.stringify(caseJson('Bruno', 50, [{ id: '01', check: true }]))
+    })
+
+    const loaded = await loadResults(dir, 'raro')
+
+    // El resumen manda: los dos alumnos siguen ahí, y el informe ilegible se
+    // anuncia en vez de hacer desaparecer a Ana de la matriz.
+    expect(loaded.resume?.cases.map((c) => c.members)).toEqual(['Ana', 'Bruno'])
+    expect(loaded.cases.map((c) => c.members)).toContain('Bruno')
+  })
+
+  it('una nota imposible llega tal cual, sin inventarse un valor', async () => {
+    dir = await makeProjectDir()
+    await writeOutput(dir, 'notas', {
+      'resume.json': JSON.stringify(
+        resumeJson([
+          { id: '01', members: 'Ana', grade: -25 },
+          { id: '02', members: 'Bruno', grade: 150 }
+        ])
+      )
+    })
+
+    const loaded = await loadResults(dir, 'notas')
+
+    // La app nunca recalcula la nota: si Teutón dice -25, el parser no lo maquilla;
+    // quien tiene que aguantarlo es la vista (ver gradeDistribution).
+    expect(loaded.resume?.cases.map((c) => c.grade)).toEqual([-25, 150])
+  })
+})

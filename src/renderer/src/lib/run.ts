@@ -48,25 +48,17 @@ export async function startRun(dir: string, options: RunOptions): Promise<void> 
   // se quedaría «activo» sin ninguna ejecución pendiente y la clase dejaría de
   // corregirse sin avisar. Pasa de verdad al reevaluar a un alumno justo cuando
   // vence el intervalo.
-  if (useApp.getState().run.status === 'running') {
-    if (useApp.getState().monitor.active) scheduleNextCycle(dir)
-    return
-  }
-  try {
-    await saveDraftsIfDirty()
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e)
-    useApp.getState().setRun({ status: 'failed' })
-    useApp.getState().appendRunLine(
-      `\n[ERROR] No se pudieron guardar los cambios antes de ejecutar: ${message}`
-    )
-    useApp.getState().setOperationalError(`No se pudieron guardar los cambios antes de ejecutar: ${message}`)
-    // El modo examen no debe morir por un fallo puntual: reintenta al siguiente ciclo.
-    if (useApp.getState().monitor.active) scheduleNextCycle(dir)
-    return
-  }
   const st = useApp.getState()
+  if (st.run.status === 'running') {
+    if (st.monitor.active) scheduleNextCycle(dir)
+    return
+  }
   const runId = crypto.randomUUID()
+  // La reserva del turno es SÍNCRONA, antes de cualquier await. Guardar los
+  // borradores cede el control, así que dos clics seguidos en «Ejecutar test»
+  // pasaban los dos por la comprobación de arriba: el segundo pisaba el runId
+  // del primero y el proceso ya lanzado quedaba huérfano — su salida se
+  // descartaba, sus notas no se guardaban y la pantalla mostraba un error.
   useApp.setState({
     run: {
       status: 'running', log: '', runId, testName: null,
@@ -78,6 +70,21 @@ export async function startRun(dir: string, options: RunOptions): Promise<void> 
     }
   })
   if (st.view === 'home' || st.view === 'settings' || st.view === 'classes') st.setView('run')
+
+  try {
+    await saveDraftsIfDirty()
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    if (useApp.getState().run.runId !== runId) return
+    useApp.getState().setRun({ status: 'failed', runId: null })
+    useApp.getState().appendRunLine(
+      `\n[ERROR] No se pudieron guardar los cambios antes de ejecutar: ${message}`
+    )
+    useApp.getState().setOperationalError(`No se pudieron guardar los cambios antes de ejecutar: ${message}`)
+    // El modo examen no debe morir por un fallo puntual: reintenta al siguiente ciclo.
+    if (useApp.getState().monitor.active) scheduleNextCycle(dir)
+    return
+  }
 
   // Calcula el total esperado de comprobaciones para la barra de progreso
   // (en paralelo, sin bloquear el arranque de la ejecución real).
