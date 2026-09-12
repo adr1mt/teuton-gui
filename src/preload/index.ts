@@ -29,12 +29,16 @@ const api: TeutonApi = {
   setGrading: (grading) => ipcRenderer.invoke(IPC.setGrading, grading),
   getDefaultGlobals: () => ipcRenderer.invoke(IPC.getDefaultGlobals),
   setDefaultGlobals: (globals) => ipcRenderer.invoke(IPC.setDefaultGlobals, globals),
+  getCredentialsStatus: () => ipcRenderer.invoke(IPC.getCredentialsStatus),
   listClasses: () => ipcRenderer.invoke(IPC.listClasses),
   saveClass: (roster) => ipcRenderer.invoke(IPC.saveClass, roster),
   deleteClass: (id) => ipcRenderer.invoke(IPC.deleteClass, id),
   getRecords: (dir, classId) => ipcRenderer.invoke(IPC.getRecords, dir, classId),
   updateRecords: (dir, grades, classId) => ipcRenderer.invoke(IPC.updateRecords, dir, grades, classId),
   resetRecords: (dir, classId) => ipcRenderer.invoke(IPC.resetRecords, dir, classId),
+  listRecordBackups: (dir) => ipcRenderer.invoke(IPC.listRecordBackups, dir),
+  restoreRecordBackup: (dir, id, classId) =>
+    ipcRenderer.invoke(IPC.restoreRecordBackup, dir, id, classId),
   getProjectMeta: (dir) => ipcRenderer.invoke(IPC.getProjectMeta, dir),
   setProjectMeta: (dir, meta) => ipcRenderer.invoke(IPC.setProjectMeta, dir, meta),
   writeClassCsv: (dir, className, classId, content) =>

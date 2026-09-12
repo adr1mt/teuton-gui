@@ -21,7 +21,13 @@ export const t = {
     value: 'Valor',
     add: 'Añadir campo',
     saved: 'Credenciales guardadas',
-    note: 'Si un proyecto ya tiene un valor puesto en su sección global, no se sobrescribe.'
+    note: 'Si un proyecto ya tiene un valor puesto en su sección global, no se sobrescribe.',
+    lockedTitle: 'Tus credenciales guardadas no se pueden leer ahora mismo',
+    lockedDesc:
+      'Siguen guardadas y cifradas, pero el llavero del sistema (gnome-keyring, kwallet) no responde, así que la tabla de abajo muestra los valores por defecto. Si guardas ahora, no se sobrescribirán las tuyas. Vuelve a entrar en la sesión del escritorio y reabre la aplicación para recuperarlas.',
+    noKeyringTitle: 'Las credenciales se guardan sin cifrar',
+    noKeyringDesc:
+      'No hay llavero del sistema disponible, así que el fichero queda solo protegido por permisos (solo tu usuario puede leerlo). Contiene la contraseña de las máquinas de los alumnos.'
   },
   home: {
     title: 'Proyectos',
@@ -220,7 +226,15 @@ export const t = {
     noDescription: '(sin descripción)',
     connection: 'Conexión',
     duration: 'Duración',
-    resetRecords: 'Reiniciar historial'
+    resetRecords: 'Reiniciar historial',
+    restoreRecords: 'Restaurar notas de una copia',
+    restoreTitle: 'Restaurar notas guardadas',
+    restoreHint:
+      'La app guarda una copia del historial de notas cada hora, fuera de la carpeta del examen. Al restaurar se combina con lo que ya hay quedándose con la nota más alta de cada alumno: nunca baja una nota.',
+    restoreEmpty: 'Todavía no hay copias de seguridad: se crean al terminar cada corrección.',
+    restoreConfirm: 'Restaurar notas',
+    restoreDone: 'Notas restauradas',
+    restoreStudents: 'alumnos'
   },
   analytics: {
     title: 'Analíticas',

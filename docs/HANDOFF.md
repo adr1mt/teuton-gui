@@ -2,8 +2,8 @@
 
 ## Objective
 
-Tanda de endurecimiento sobre la 1.0.0: robustez, seguridad y una UAT hostil.
-Terminada. Lo siguiente debe salir de usar la app en un examen real.
+Red de seguridad para las notas antes del próximo examen real. Hecho lo de no
+perder datos; lo siguiente debe salir de usar la app en clase.
 
 ## Completed
 
@@ -35,11 +35,23 @@ Terminada. Lo siguiente debe salir de usar la app en un examen real.
   (`prevent-display-sleep`, porque el panel está proyectado) y lo suelta al
   pararlo o al salir. Sin esto el escritorio daba el equipo por inactivo —nadie
   toca el teclado durante un examen— y lo suspendía a las 2 h, justo al final.
-- Verificado: `npm run typecheck`, `npm test` (113), `npm run test:e2e` (19) y
+- Verificado: `npm run typecheck`, `npm test` (113), `npm run test:e2e` (20) y
   `./scripts/instalar.sh --forzar`. El escenario 15 prueba el AppImage ya
   empaquetado: arranca con ventana y la CSP bloquea un script inline.
 - Comprobado de paso: el `files` de electron-builder no mete dependencias de
   desarrollo (los recursos empaquetados pesan 7,5 MB).
+- **Copia de seguridad de las notas, fuera de la carpeta del examen**. El
+  historial de mejores notas vivía solo dentro del proyecto: borrar la carpeta o
+  pulsar «Reiniciar historial» por error lo perdía sin vuelta atrás. Ahora cada
+  corrección deja una copia por hora en `~/.config/teuton-gui/copias-notas/`
+  (unos KB de JSON) y «Restaurar notas de una copia» está en el menú «…» de
+  Resultados y también en la pantalla vacía, que es donde acaba quien ha perdido
+  la carpeta. Restaurar fusiona por máximo: nunca baja una nota ya guardada.
+  Escenario 20 de la UAT.
+- **Ajustes avisa si no puede leer las credenciales guardadas**. Si el llavero
+  del escritorio no responde, la app usaba usuario/usuario y eso solo se veía en
+  el log: la tabla parecía correcta. Ahora lo dice en pantalla, y también avisa
+  cuando se guardan sin cifrar por no haber llavero.
 
 ## In progress
 
@@ -55,6 +67,16 @@ no usa USB.
 
 Sigue pendiente de decidir en clase: si 16rem de ancho mínimo en la columna de
 preguntas es el bueno, y si con 30 alumnos el nombre de pila basta.
+
+Mejoras propuestas y aún no hechas, por orden de valor: distinguir «máquina
+apagada» de «suspenso» en la matriz (hay que comprobar antes si el JSON de
+Teutón lo dice); un botón «¿Todo listo?» que compruebe Teutón, YAML, clase y
+`teuton check` antes de empezar; un «modo proyector» que agrande el texto y
+oculte IPs y contraseñas; y un aviso de alumno estancado varios ciclos.
+
+Ojo al ejecutar la UAT: `npm run test:e2e` **no** compila. Hay que pasar por
+`npm run build` (o `./scripts/instalar.sh --forzar` para el escenario 15) o se
+prueba el build anterior.
 
 ## References
 

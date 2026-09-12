@@ -126,7 +126,7 @@ Each of these has a bug behind it. Read the one that covers what you are about t
 | the progress bar or stdout parsing | Live progress bar |
 | grades, passing thresholds, KPIs | Grading conversion |
 | Settings, shared credentials, class import | App-level default globals |
-| Moodle export, grade history, «Reiniciar historial» | Best-grade record / Per-class Moodle CSVs |
+| Moodle export, grade history, «Reiniciar historial», «Restaurar notas» | Best-grade record / Hourly grade backups / Per-class Moodle CSVs |
 | the editor, drafts, launching a run | Draft-vs-disk consistency |
 | the dashboard matrix, analytics, report loading | Corrupt `case-NN.json` |
 | invoking the `teuton` binary | PATH discovery |
@@ -209,6 +209,26 @@ scope, never a class. Which class a run belongs to is stamped in `.teuton-gui-me
 (`lib/run.ts`) uses that — not the currently active class — when "load last results" merges records. The
 dashboard's "Reiniciar historial" button (`records:reset` IPC) clears one class's records, e.g. after a
 practice pass before the real exam.
+
+**Hourly grade backups** (`writeBackup`/`listRecordBackups`/`restoreRecordBackup` in `main/store.ts`,
+`copias-notas/` in `userData`). Because the record lives *inside* the project, deleting or moving the exam
+folder took the grades with it, and one mistaken «Reiniciar historial» was unrecoverable. Every successful
+`updateRecords` therefore drops a copy of the whole records file outside the project, under
+`userData/copias-notas/<project>-<8-char path hash>/<YYYY-MM-DD-HH>.json` (a few KB of JSON, so it doesn't
+violate the "nothing large on `/`" rule), keeping the last 48. **One copy per hour, and that copy is merged
+with `Math.max` into whatever the same hour already held** — the exam loop writes dozens of times an hour
+(one file per write is unusable), yet a reset followed by another run within the same hour must not
+overwrite the copy with the now-empty history, which is the only thing left to recover from. Restoring also
+merges by max, so recovering old grades can never lower one already stored, and a restore proceeds even
+when the project's own records file is unparseable — that is precisely the case it exists to fix. The
+dashboard offers it in the «…» menu *and* in the empty state, because a teacher who lost the project folder
+lands on the empty view.
+
+**Credential store status surfaced in Settings** (`getCredentialsStatus`). When the desktop keyring is down,
+`getDefaultGlobals` returns `usuario`/`usuario` with the real credentials still encrypted on disk. That used
+to live only in a `console.error`, so the teacher saw plausible-looking defaults in the table and no hint
+that saving was refused; Settings now says it. The status is computed by *attempting* a read (the failure is
+only knowable that way) and `lastDecryptError` caches the last attempt's outcome.
 
 **Per-class Moodle CSVs**. The teacher runs the *same* exam project with several class groups. When a class
 is imported into a project (ConfigTable), its name and roster id are remembered in

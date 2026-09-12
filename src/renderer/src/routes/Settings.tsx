@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { CheckCircle2, AlertTriangle, RefreshCw, Copy, Check, Plus, Trash2 } from 'lucide-react'
+import { CheckCircle2, AlertTriangle, RefreshCw, Copy, Check, Plus, Trash2, KeyRound } from 'lucide-react'
 import { useApp } from '../stores/app'
 import { t } from '../i18n/es'
 import {
@@ -12,6 +12,7 @@ import {
   ViewHeader
 } from '../components/ui'
 import { formatGrade } from '../lib/grading'
+import type { CredentialsStatus } from '../../../shared/types'
 import { isSecretColumn } from '../lib/config'
 import { cn } from '../lib/utils'
 
@@ -28,8 +29,21 @@ export default function Settings() {
   const [pathSaved, setPathSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [gradingDraft, setGradingDraft] = useState(grading)
+  const [credentials, setCredentials] = useState<CredentialsStatus | null>(null)
 
   useEffect(() => setGradingDraft(grading), [grading])
+
+  // Estado del almacén de credenciales: si el llavero del escritorio no responde,
+  // la app usa los valores por defecto y hasta ahora eso solo se veía en el log.
+  useEffect(() => {
+    let cancelled = false
+    window.teuton.getCredentialsStatus()
+      .then((status) => !cancelled && setCredentials(status))
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -315,6 +329,29 @@ export default function Settings() {
         <SectionTitle hint={t.credentials.note}>{t.credentials.title}</SectionTitle>
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">{t.credentials.desc}</p>
+          {credentials && credentials.stored && !credentials.readable && (
+            <div role="alert" className="flex items-start gap-3 rounded-md border border-destructive/30 bg-destructive/10 p-3.5">
+              <KeyRound className="mt-0.5 h-5 w-5 shrink-0 text-destructive-strong" />
+              <div>
+                <div className="font-medium text-destructive-strong">
+                  {t.credentials.lockedTitle}
+                </div>
+                <div className="mt-0.5 text-sm text-muted-foreground">{t.credentials.lockedDesc}</div>
+                {credentials.error && (
+                  <div className="mt-1 font-mono text-xs text-muted-foreground">{credentials.error}</div>
+                )}
+              </div>
+            </div>
+          )}
+          {credentials && credentials.readable && !credentials.encryptionAvailable && (
+            <div role="alert" className="flex items-start gap-3 rounded-md border border-warning/30 bg-warning/10 p-3.5">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning-strong" />
+              <div>
+                <div className="font-medium text-warning-strong">{t.credentials.noKeyringTitle}</div>
+                <div className="mt-0.5 text-sm text-muted-foreground">{t.credentials.noKeyringDesc}</div>
+              </div>
+            </div>
+          )}
           <div className="space-y-2">
             <div className="grid grid-cols-[1fr_1fr_auto] gap-2 px-1 text-micro font-semibold uppercase tracking-[0.09em] text-muted-foreground">
               <span>{t.credentials.field}</span>

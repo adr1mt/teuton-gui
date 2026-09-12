@@ -161,6 +161,23 @@ export interface GradingSettings {
  */
 export type DefaultGlobals = Record<string, string>
 
+/**
+ * Estado del almacén de credenciales. `readable: false` con `stored: true` es el
+ * caso que hay que contarle al profesor: hay credenciales guardadas y cifradas
+ * que ahora mismo no se pueden leer (llavero del escritorio caído), así que la
+ * app está usando los valores por defecto sin que se note.
+ */
+export interface CredentialsStatus {
+  /** Hay un fichero de credenciales cifrado guardado. */
+  stored: boolean
+  /** Se han podido leer las credenciales guardadas. */
+  readable: boolean
+  /** El cifrado del sistema está disponible de verdad (hay llavero). */
+  encryptionAvailable: boolean
+  /** Motivo técnico del fallo, para poder diagnosticarlo. */
+  error?: string
+}
+
 // ---- Clases / alumnos persistentes ----
 
 export interface Student {
@@ -176,6 +193,18 @@ export interface ClassRoster {
   students: Student[]
   createdAt: number
   updatedAt: number
+}
+
+/**
+ * Copia de seguridad del historial de notas de un proyecto, guardada fuera de él.
+ * Una por hora; `id` es su sello de tiempo (`2026-09-12-10`).
+ */
+export interface RecordBackup {
+  id: string
+  /** Momento en que se guardó (0 si la copia no lo trae). */
+  savedAt: number
+  /** Alumnos distintos con nota en la copia, contando todas las clases. */
+  students: number
 }
 
 /** Récord histórico de mejor nota (0-100) por alumno, por proyecto. */
@@ -241,6 +270,8 @@ export interface TeutonApi {
   // Valores globales por defecto (usuario/contraseña de las máquinas, etc.)
   getDefaultGlobals: () => Promise<DefaultGlobals>
   setDefaultGlobals: (globals: DefaultGlobals) => Promise<void>
+  /** ¿Se pueden leer las credenciales guardadas? Lo muestra Ajustes. */
+  getCredentialsStatus: () => Promise<CredentialsStatus>
 
   // Clases / alumnos persistentes
   listClasses: () => Promise<ClassRoster[]>
@@ -253,6 +284,10 @@ export interface TeutonApi {
   updateRecords: (dir: string, grades: GradeRecords, classId?: string) => Promise<PersistenceResult<GradeRecords>>
   /** Borra el historial de mejores notas de la clase indicada (o del espacio manual). */
   resetRecords: (dir: string, classId?: string) => Promise<PersistenceResult<GradeRecords>>
+  /** Copias de seguridad disponibles del historial, de la más reciente a la más antigua. */
+  listRecordBackups: (dir: string) => Promise<RecordBackup[]>
+  /** Restaura una copia fusionando por máximo: nunca rebaja una nota ya guardada. */
+  restoreRecordBackup: (dir: string, id: string, classId?: string) => Promise<PersistenceResult<GradeRecords>>
 
   // Metadatos del proyecto (clase activa, etc.)
   getProjectMeta: (dir: string) => Promise<ProjectMeta>

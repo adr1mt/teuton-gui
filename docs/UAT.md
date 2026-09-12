@@ -48,9 +48,10 @@ npm run verify:parsing -- <proyecto ya ejecutado>
 | 17 | Cerrar la ventana con una corrección en marcha | No se cierra: el aviso la retiene |
 | 18 | Cerrar la sesión del escritorio (SIGTERM) a mitad | Cero procesos vivos después |
 | 19 | Modo examen activo | Bloquea la suspensión del equipo, y la suelta al detenerlo |
+| 20 | «Reiniciar historial» por error tras corregir | La copia de seguridad existe fuera del proyecto y «Restaurar notas» devuelve las notas |
 
 El 17 deja un Electron bloqueado en un diálogo nativo que hay que matar, así que
-la suite termina con un aviso de «worker teardown» aunque los 18 pasen y el
+la suite termina con un aviso de «worker teardown» aunque los 20 pasen y el
 código de salida sea 0. Es ruido, no un fallo.
 
 Y en los tests unitarios: `classes.json` sin permisos de lectura (las clases no

@@ -26,6 +26,9 @@ import {
   getRecords,
   updateRecords,
   resetRecords,
+  listRecordBackups,
+  restoreRecordBackup,
+  getCredentialsStatus,
   getProjectMeta,
   setProjectMeta,
   writeClassCsv,
@@ -511,6 +514,7 @@ export function registerIpc(): void {
   })
 
   handle(IPC.getDefaultGlobals, () => getDefaultGlobals())
+  handle(IPC.getCredentialsStatus, () => getCredentialsStatus())
   handle(IPC.setDefaultGlobals, (_e, globals) => setDefaultGlobals(validatedGlobals(globals)))
 
   handle(IPC.listClasses, () => listClasses())
@@ -529,6 +533,14 @@ export function registerIpc(): void {
   )
   handle(IPC.resetRecords, (_e, dir, classId) =>
     resetRecords(projectDir(dir), validatedOptionalId(classId, 'El identificador de la clase'))
+  )
+  handle(IPC.listRecordBackups, (_e, dir) => listRecordBackups(projectDir(dir)))
+  handle(IPC.restoreRecordBackup, (_e, dir, id, classId) =>
+    restoreRecordBackup(
+      projectDir(dir),
+      validatedText(id, 'El identificador de la copia', 32),
+      validatedOptionalId(classId, 'El identificador de la clase')
+    )
   )
 
   handle(IPC.getProjectMeta, (_e, dir) => getProjectMeta(projectDir(dir)))

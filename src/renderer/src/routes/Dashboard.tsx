@@ -10,6 +10,7 @@ import {
   LayoutGrid,
   Trophy,
   History,
+  ArchiveRestore,
   ArrowUpDown,
   RotateCw,
   MoreVertical,
@@ -55,6 +56,7 @@ import { sanitizeFileName } from '../../../shared/sanitize'
 import StudentDetail from '../components/StudentDetail'
 import { MonitorBanner } from '../components/Monitor'
 import { validateResultIdentity } from '../lib/integrity'
+import type { RecordBackup } from '../../../shared/types'
 
 type ViewMode = 'list' | 'matrix'
 type Grading = { passScore: number; maxGrade: number }
@@ -98,6 +100,8 @@ export default function Dashboard() {
   const [mode, setMode] = useState<ViewMode>('list')
   const [sortId, setSortId] = useState('natural')
   const [confirmReset, setConfirmReset] = useState(false)
+  const [backups, setBackups] = useState<RecordBackup[] | null>(null)
+  const [restoreId, setRestoreId] = useState<string | null>(null)
   const [confirmExport, setConfirmExport] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
 
@@ -149,6 +153,44 @@ export default function Dashboard() {
       if (!outcome.persisted) useApp.getState().setOperationalError(outcome.warning || 'No se pudo guardar el reinicio del historial.')
     } catch (cause) {
       useApp.getState().setOperationalError(`No se pudo reiniciar el historial: ${cause instanceof Error ? cause.message : String(cause)}`)
+    }
+  }
+
+  /**
+   * Abre la lista de copias. Se pide al abrir, no al montar la vista: es una
+   * acción excepcional y no debe tocar el disco en cada ciclo del modo examen.
+   */
+  async function openRestore() {
+    if (!project) return
+    try {
+      const list = await window.teuton.listRecordBackups(project.dir)
+      if (list.length === 0) {
+        setNotice(t.dashboard.restoreEmpty)
+        window.setTimeout(() => setNotice(null), 6000)
+        return
+      }
+      setRestoreId(list[0].id)
+      setBackups(list)
+    } catch (cause) {
+      useApp.getState().setOperationalError(`No se pudieron leer las copias de seguridad: ${cause instanceof Error ? cause.message : String(cause)}`)
+    }
+  }
+
+  async function doRestore() {
+    const id = restoreId
+    setBackups(null)
+    if (!project || !id) return
+    try {
+      const outcome = await window.teuton.restoreRecordBackup(project.dir, id, resultClassId ?? undefined)
+      setRecords(outcome.data)
+      if (outcome.persisted) {
+        setNotice(`${t.dashboard.restoreDone} · ${Object.keys(outcome.data).length} ${t.dashboard.restoreStudents}`)
+        window.setTimeout(() => setNotice(null), 6000)
+      } else {
+        useApp.getState().setOperationalError(outcome.warning || 'No se pudo guardar el historial restaurado.')
+      }
+    } catch (cause) {
+      useApp.getState().setOperationalError(`No se pudieron restaurar las notas: ${cause instanceof Error ? cause.message : String(cause)}`)
     }
   }
 
@@ -222,7 +264,22 @@ export default function Dashboard() {
               <RefreshCw className="h-4 w-4" /> {t.run.loadResults}
             </Button>
           )}
+          {/* También aquí: el caso peor —carpeta del examen borrada— deja la
+              vista vacía, y es justo cuando hay que poder restaurar las notas. */}
+          {project && (
+            <Button variant="ghost" size="sm" onClick={() => void openRestore()}>
+              <ArchiveRestore className="h-4 w-4" /> {t.dashboard.restoreRecords}
+            </Button>
+          )}
         </div>
+        {notice && <p className="max-w-md text-center text-xs text-muted-foreground">{notice}</p>}
+        <RestoreDialog
+          backups={backups}
+          selected={restoreId}
+          onSelect={setRestoreId}
+          onConfirm={() => void doRestore()}
+          onCancel={() => setBackups(null)}
+        />
       </div>
     )
   }
@@ -343,6 +400,15 @@ export default function Dashboard() {
                     }}
                   >
                     {t.dashboard.openFolder}
+                  </MenuItem>
+                  <MenuItem
+                    icon={<ArchiveRestore className="h-4 w-4" />}
+                    onClick={() => {
+                      close()
+                      void openRestore()
+                    }}
+                  >
+                    {t.dashboard.restoreRecords}
                   </MenuItem>
                   {Object.keys(records).length > 0 && (
                     <MenuItem
@@ -475,6 +541,14 @@ export default function Dashboard() {
         <p>{t.dashboard.resetConsequence}</p>
       </ConfirmDialog>
 
+      <RestoreDialog
+        backups={backups}
+        selected={restoreId}
+        onSelect={setRestoreId}
+        onConfirm={() => void doRestore()}
+        onCancel={() => setBackups(null)}
+      />
+
       <ConfirmDialog
         open={confirmExport}
         title={t.dashboard.exportWarnTitle}
@@ -486,6 +560,71 @@ export default function Dashboard() {
       </ConfirmDialog>
     </div>
   )
+}
+
+/**
+ * Lista de copias de seguridad del historial, para elegir una. Vive aquí porque
+ * se usa en dos sitios: la vista con resultados y la vista vacía, que es donde
+ * acaba el profesor si ha perdido la carpeta del examen.
+ */
+function RestoreDialog({
+  backups,
+  selected,
+  onSelect,
+  onConfirm,
+  onCancel
+}: {
+  backups: RecordBackup[] | null
+  selected: string | null
+  onSelect: (id: string) => void
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  return (
+    <ConfirmDialog
+      open={backups !== null}
+      title={t.dashboard.restoreTitle}
+      confirmLabel={t.dashboard.restoreConfirm}
+      onConfirm={onConfirm}
+      onCancel={onCancel}
+    >
+      <p>{t.dashboard.restoreHint}</p>
+      <div className="mt-2 max-h-64 space-y-1 overflow-y-auto">
+        {(backups ?? []).map((b) => (
+          <label
+            key={b.id}
+            className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted"
+          >
+            <input
+              type="radio"
+              name="copia-notas"
+              checked={selected === b.id}
+              onChange={() => onSelect(b.id)}
+            />
+            <span className="tnum text-foreground">{backupLabel(b)}</span>
+            <span className="tnum ml-auto text-xs">
+              {b.students} {t.dashboard.restoreStudents}
+            </span>
+          </label>
+        ))}
+      </div>
+    </ConfirmDialog>
+  )
+}
+
+/**
+ * Fecha y hora de una copia, en lo que el profesor reconoce. Si la copia no
+ * trae sello de tiempo se muestra su identificador, que ya es la hora.
+ */
+function backupLabel(b: RecordBackup): string {
+  if (!b.savedAt) return b.id
+  return new Date(b.savedAt).toLocaleString('es-ES', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
 }
 
 /**

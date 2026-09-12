@@ -1,14 +1,16 @@
 import { app, safeStorage } from 'electron'
 import { promises as fs } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { randomUUID } from 'node:crypto'
+import { basename, dirname, join } from 'node:path'
+import { createHash, randomUUID } from 'node:crypto'
 import type {
   ClassRoster,
+  CredentialsStatus,
   DefaultGlobals,
   GradeRecords,
   GradingSettings,
   PersistenceResult,
-  ProjectMeta
+  ProjectMeta,
+  RecordBackup
 } from '../shared/types'
 import { sanitizeFileName } from '../shared/sanitize'
 import { validatedGrading, validatedRecords } from './validation'
@@ -216,6 +218,14 @@ async function encFileExists(): Promise<boolean> {
   }
 }
 
+/**
+ * Último motivo por el que no se pudieron descifrar las credenciales guardadas.
+ * Se refresca en cada `getDefaultGlobals()` y lo lee Ajustes: si esto solo vive
+ * en el log, el profesor ve usuario/usuario en la tabla sin saber que sus
+ * credenciales reales siguen guardadas y no se han podido leer.
+ */
+let lastDecryptError: string | null = null
+
 export async function getDefaultGlobals(): Promise<DefaultGlobals> {
   if (await encFileExists()) {
     try {
@@ -227,6 +237,7 @@ export async function getDefaultGlobals(): Promise<DefaultGlobals> {
       }
       const encrypted = await fs.readFile(userFile('default-globals.enc'), 'utf-8')
       const g = JSON.parse(safeStorage.decryptString(Buffer.from(encrypted, 'base64')))
+      lastDecryptError = null
       return sanitizeGlobals(g)
     } catch (err) {
       // Hay credenciales cifradas guardadas pero AHORA MISMO no se pueden leer
@@ -237,6 +248,7 @@ export async function getDefaultGlobals(): Promise<DefaultGlobals> {
       // diagnosticarlo — mejora pendiente: reflejar este estado en Ajustes en vez
       // de solo el log. setDefaultGlobals más abajo impide además que un guardado
       // posterior sobrescriba en claro el cifrado que no hemos podido leer.
+      lastDecryptError = err instanceof Error ? err.message : String(err)
       console.error(
         'getDefaultGlobals: existe default-globals.enc pero no se pudo descifrar ' +
           '(¿llavero del sistema no disponible?). Se devuelven valores por defecto ' +
@@ -247,7 +259,23 @@ export async function getDefaultGlobals(): Promise<DefaultGlobals> {
     }
   }
   // No hay .enc: o es la primera vez, o venimos de una instalación antigua en claro.
+  lastDecryptError = null
   return sanitizeGlobals(await readJson<DefaultGlobals>('default-globals.json', DEFAULT_GLOBALS))
+}
+
+/**
+ * Estado del almacén de credenciales, para poder decirlo en Ajustes en vez de
+ * dejarlo solo en el log. Lanza `getDefaultGlobals()` primero porque el fallo de
+ * descifrado solo se conoce al intentarlo.
+ */
+export async function getCredentialsStatus(): Promise<CredentialsStatus> {
+  await getDefaultGlobals()
+  return {
+    stored: await encFileExists(),
+    readable: lastDecryptError === null,
+    encryptionAvailable: hasRealEncryption(),
+    error: lastDecryptError ?? undefined
+  }
 }
 
 export async function setDefaultGlobals(globals: DefaultGlobals): Promise<void> {
@@ -387,12 +415,18 @@ async function readRecords(dir: string): Promise<ScopedRecords | null> {
   return null
 }
 
-export async function getRecords(dir: string, classId?: string): Promise<GradeRecords> {
-  const stored = await readRecords(dir)
+/**
+ * Notas visibles para una clase. Solo los casos manuales pueden consultar el
+ * historial anterior a la separación por clases; una clase importada debe
+ * empezar aislada para impedir cruces entre grupos.
+ */
+function scopedView(stored: ScopedRecords | null, classId?: string): GradeRecords {
   const scoped = stored?.classes[classScope(classId)] ?? {}
-  // Solo los casos manuales pueden consultar el historial anterior; una clase
-  // importada debe empezar aislada para impedir cruces entre grupos.
   return classId ? { ...scoped } : { ...(stored?.legacy ?? {}), ...scoped }
+}
+
+export async function getRecords(dir: string, classId?: string): Promise<GradeRecords> {
+  return scopedView(await readRecords(dir), classId)
 }
 
 /** Fusiona las notas nuevas quedándose con el máximo por alumno y por clase. */
@@ -427,6 +461,11 @@ export async function updateRecords(
     try {
       stored.classes[scope] = current
       await writeAtomic(recordsPath(dir), JSON.stringify(stored, null, 2))
+      // La copia de seguridad es un extra fuera del proyecto: si falla, el
+      // historial ya está guardado donde toca y la escritura no es un fracaso.
+      await writeBackup(dir, stored).catch((err) =>
+        console.error('No se pudo guardar la copia de seguridad del historial de notas:', err)
+      )
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err)
       return {
@@ -468,6 +507,190 @@ export async function resetRecords(
       }
     }
     return { data: {}, persisted: true }
+  })
+}
+
+// ---- Copias de seguridad del historial de notas ----
+
+/**
+ * El historial de mejores notas vive dentro del proyecto para viajar con él,
+ * pero eso significa que borrar o mover la carpeta del examen se lleva las notas
+ * por delante, y un «Reiniciar historial» a destiempo también. Tras cada
+ * escritura correcta se deja una copia en `userData` (unos pocos KB de JSON, así
+ * que no es de lo que no puede vivir en `/`), fuera del proyecto.
+ *
+ * Una copia por hora y proyecto: el modo examen escribe decenas de veces en un
+ * examen de dos horas y no queremos decenas de ficheros, pero tampoco una única
+ * copia diaria, que un reinicio por error acabaría sobrescribiendo con el
+ * historial ya vacío.
+ */
+const BACKUPS_KEPT = 48
+
+export const BACKUP_ID_RE = /^\d{4}-\d{2}-\d{2}-\d{2}$/
+
+interface BackupFile {
+  savedAt: number
+  projectDir: string
+  records: ScopedRecords
+}
+
+function backupsDir(dir: string): string {
+  // El hash de la ruta distingue dos proyectos llamados igual en carpetas
+  // distintas; el nombre legible delante es para que el profesor reconozca la
+  // carpeta si alguna vez la abre.
+  const hash = createHash('sha1').update(dir).digest('hex').slice(0, 8)
+  return join(app.getPath('userData'), 'copias-notas', `${sanitizeFileName(basename(dir), 'proyecto')}-${hash}`)
+}
+
+function currentBackupId(when = new Date()): string {
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  return `${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())}-${pad(when.getHours())}`
+}
+
+/** Alumnos distintos con nota guardada en la copia (todas las clases). */
+function countStudents(records: ScopedRecords): number {
+  const names = new Set<string>(Object.keys(records.legacy ?? {}))
+  for (const grades of Object.values(records.classes ?? {})) {
+    for (const name of Object.keys(grades)) names.add(name)
+  }
+  return names.size
+}
+
+/**
+ * Comprueba que la copia tiene forma de historial v2 y valida cada nota.
+ * Devuelve `null` si no lo es y lanza si alguna nota es imposible: una copia
+ * dañada no puede entrar en el fichero bueno.
+ */
+function sanitizeScoped(value: unknown): ScopedRecords | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const raw = value as Partial<ScopedRecords>
+  if (!raw.classes || typeof raw.classes !== 'object' || Array.isArray(raw.classes)) return null
+  const clean: ScopedRecords = { version: 2, classes: {} }
+  for (const [scope, grades] of Object.entries(raw.classes as Record<string, unknown>)) {
+    clean.classes[scope] = mergeTrimmedKeys(validatedRecords(grades))
+  }
+  if (raw.legacy) clean.legacy = mergeTrimmedKeys(validatedRecords(raw.legacy))
+  return clean
+}
+
+/** Fusiona dos historiales quedándose con la nota más alta de cada alumno. */
+function mergeScoped(base: ScopedRecords, extra: ScopedRecords): ScopedRecords {
+  const merged: ScopedRecords = { version: 2, classes: { ...base.classes } }
+  if (base.legacy) merged.legacy = { ...base.legacy }
+  const mergeInto = (current: GradeRecords, grades: GradeRecords): GradeRecords => {
+    const out = { ...current }
+    for (const [name, grade] of Object.entries(grades)) {
+      if (!(name in out) || grade > out[name]) out[name] = grade
+    }
+    return out
+  }
+  for (const [scope, grades] of Object.entries(extra.classes)) {
+    merged.classes[scope] = mergeInto(merged.classes[scope] ?? {}, grades)
+  }
+  if (extra.legacy) merged.legacy = mergeInto(merged.legacy ?? {}, extra.legacy)
+  return merged
+}
+
+/** Lee una copia concreta. `null` si no existe o no tiene forma de historial. */
+async function readBackup(dir: string, id: string): Promise<ScopedRecords | null> {
+  try {
+    const file = JSON.parse(await fs.readFile(join(backupsDir(dir), `${id}.json`), 'utf-8')) as BackupFile
+    return sanitizeScoped(file?.records)
+  } catch (error) {
+    if (isMissing(error)) return null
+    throw error
+  }
+}
+
+async function writeBackup(dir: string, stored: ScopedRecords): Promise<void> {
+  const folder = backupsDir(dir)
+  await fs.mkdir(folder, { recursive: true })
+  const id = currentBackupId()
+  // Se fusiona con la copia que ya hubiera de esta hora: si el profesor reinicia
+  // el historial por error y vuelve a corregir en la misma hora, la escritura no
+  // puede dejar la copia con el historial ya vacío, que es lo único que quedaba
+  // para recuperar las notas.
+  const previous = await readBackup(dir, id).catch(() => null)
+  const records = previous ? mergeScoped(previous, stored) : stored
+  const payload: BackupFile = { savedAt: Date.now(), projectDir: dir, records }
+  await writeAtomic(join(folder, `${id}.json`), JSON.stringify(payload, null, 2))
+  // Los nombres van en orden cronológico porque llevan ceros delante.
+  const files = (await fs.readdir(folder)).filter((f) => f.endsWith('.json')).sort()
+  for (const old of files.slice(0, Math.max(0, files.length - BACKUPS_KEPT))) {
+    await fs.unlink(join(folder, old)).catch(() => undefined)
+  }
+}
+
+export async function listRecordBackups(dir: string): Promise<RecordBackup[]> {
+  const folder = backupsDir(dir)
+  let names: string[]
+  try {
+    names = await fs.readdir(folder)
+  } catch (error) {
+    if (isMissing(error)) return []
+    throw new Error(
+      `No se pudieron leer las copias de seguridad: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+  const list: RecordBackup[] = []
+  for (const name of names.filter((n) => n.endsWith('.json')).sort().reverse()) {
+    try {
+      const file = JSON.parse(await fs.readFile(join(folder, name), 'utf-8')) as BackupFile
+      const records = sanitizeScoped(file?.records)
+      if (!records) continue
+      list.push({
+        id: name.slice(0, -'.json'.length),
+        savedAt: Number.isFinite(file?.savedAt) ? file.savedAt : 0,
+        students: countStudents(records)
+      })
+    } catch {
+      // Una copia ilegible no puede esconder las demás: es justo cuando hacen falta.
+    }
+  }
+  return list
+}
+
+/**
+ * Restaura una copia fusionando por máximo, igual que `updateRecords`: recuperar
+ * notas antiguas nunca puede rebajar una nota que ya estuviera guardada.
+ */
+export async function restoreRecordBackup(
+  dir: string,
+  id: string,
+  classId?: string
+): Promise<PersistenceResult<GradeRecords>> {
+  if (!BACKUP_ID_RE.test(id)) throw new Error('Esa copia de seguridad no existe.')
+  let backup: ScopedRecords | null
+  try {
+    backup = await readBackup(dir, id)
+  } catch (error) {
+    throw new Error(
+      `No se pudo leer la copia de seguridad: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+  if (!backup) throw new Error('Esa copia de seguridad no existe o está dañada.')
+
+  return serialized(recordsPath(dir), async () => {
+    let current: ScopedRecords
+    try {
+      current = (await readRecords(dir)) ?? { version: 2, classes: {} }
+    } catch {
+      // El historial del proyecto no se puede interpretar; es precisamente el
+      // caso que esta función existe para arreglar, así que se restaura la copia
+      // tal cual en vez de negarse a recuperar nada.
+      current = { version: 2, classes: {} }
+    }
+    const restored = mergeScoped(current, backup)
+    try {
+      await writeAtomic(recordsPath(dir), JSON.stringify(restored, null, 2))
+    } catch (err) {
+      return {
+        data: scopedView(restored, classId),
+        persisted: false,
+        warning: `No se pudo guardar el historial restaurado: ${err instanceof Error ? err.message : String(err)}`
+      }
+    }
+    return { data: scopedView(restored, classId), persisted: true }
   })
 }
 
