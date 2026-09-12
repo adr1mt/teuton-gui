@@ -123,6 +123,18 @@ function handle(
   })
 }
 
+/** Escritura atómica con permisos restrictivos, para ficheros con notas. */
+async function writeExport(path: string, content: string): Promise<void> {
+  const temp = `${path}.tmp`
+  try {
+    await fs.writeFile(temp, content, { encoding: 'utf-8', mode: 0o600 })
+    await fs.rename(temp, path)
+  } catch (error) {
+    await fs.unlink(temp).catch(() => undefined)
+    throw error
+  }
+}
+
 const KILL_ESCALATION_MS = 3000
 
 function isAlive(child: ChildProcess): boolean {
@@ -373,7 +385,9 @@ export function registerIpc(): void {
       defaultPath: join(app.getPath('documents'), safeName)
     })
     if (res.canceled || !res.filePath) return null
-    await fs.writeFile(res.filePath, safeContent, 'utf-8')
+    // Contiene notas de alumnos: 0600, y escritura atómica para no destruir una
+    // exportación anterior si falla a medias (writeFile trunca antes de escribir).
+    await writeExport(res.filePath, safeContent)
     return res.filePath
   })
 

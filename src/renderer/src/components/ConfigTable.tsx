@@ -51,6 +51,10 @@ export default function ConfigTable({
   if (columns.length === 0) columns.push('tt_members')
 
   function emit(next: TeutonConfig) {
+    // Con el YAML roto, `parseConfig` devuelve una configuración VACÍA. Editar
+    // aquí volcaría ese vacío al fichero: un clic en «añadir alumno» borraba la
+    // clase entera, y el siguiente ciclo del modo examen lo guardaba en disco.
+    if (error) return
     onChange(stringifyConfig(next))
   }
 
@@ -159,12 +163,16 @@ export default function ConfigTable({
         />
       )}
       {error && (
-        <div className="mx-4 mt-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning-strong">
-          No se pudo interpretar el YAML: {error}. Edítalo en la pestaña «{t.editor.rawYaml}».
+        <div role="alert" className="mx-4 mt-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning-strong">
+          No se pudo interpretar el YAML: {error}. La tabla está bloqueada para no perder los datos
+          de los alumnos: arréglalo en la pestaña «{t.editor.rawYaml}».
         </div>
       )}
 
-      <div className="flex-1 space-y-6 overflow-y-auto p-4">
+      <div
+        className={cn('flex-1 space-y-6 overflow-y-auto p-4', error && 'pointer-events-none opacity-50')}
+        aria-disabled={error ? true : undefined}
+      >
         {/* Global */}
         <section>
           <div className="mb-2 flex items-center justify-between">

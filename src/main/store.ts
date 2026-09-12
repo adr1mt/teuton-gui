@@ -1,6 +1,6 @@
 import { app, safeStorage } from 'electron'
 import { promises as fs } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type {
   ClassRoster,
@@ -19,17 +19,57 @@ function userFile(name: string): string {
   return join(app.getPath('userData'), name)
 }
 
+function isMissing(error: unknown): boolean {
+  return (error as NodeJS.ErrnoException)?.code === 'ENOENT'
+}
+
+/**
+ * Lee un JSON de userData. Solo «el fichero no existe» vale como ausencia: un
+ * fichero ilegible (permisos, disco con errores) o corrupto tiene que dar error,
+ * no el valor por defecto. Tragarlo era pérdida total de datos — un
+ * `classes.json` que no se podía abrir parecía «no hay clases» y el siguiente
+ * guardado lo reescribía vacío, llevándose todos los grupos del centro.
+ */
 async function readJson<T>(name: string, fallback: T): Promise<T> {
+  let raw: string
   try {
-    return JSON.parse(await fs.readFile(userFile(name), 'utf-8')) as T
+    raw = await fs.readFile(userFile(name), 'utf-8')
+  } catch (error) {
+    if (isMissing(error)) return fallback
+    throw new Error(
+      `No se pudo leer ${name}: ${error instanceof Error ? error.message : String(error)}. ` +
+        'No se ha modificado nada para no perder los datos guardados.'
+    )
+  }
+  try {
+    return JSON.parse(raw) as T
   } catch {
-    return fallback
+    throw new Error(`El fichero ${name} está dañado y no se puede interpretar. No se ha modificado nada.`)
   }
 }
 
 async function writeJson(name: string, data: unknown): Promise<void> {
   await fs.mkdir(app.getPath('userData'), { recursive: true })
   await writeAtomic(userFile(name), JSON.stringify(data, null, 2))
+}
+
+/**
+ * Serializa las escrituras sobre un mismo fichero. Todo lo que hay aquí es
+ * leer→fusionar→escribir y el renderer las dispara en paralelo (cada ciclo del
+ * modo examen actualiza récords y metadatos): sin cola, dos operaciones leen el
+ * mismo estado y la última borra la mejor nota que acababa de guardar la otra.
+ */
+const writeQueues = new Map<string, Promise<unknown>>()
+
+function serialized<T>(key: string, operation: () => Promise<T>): Promise<T> {
+  const previous = writeQueues.get(key) ?? Promise.resolve()
+  const next = previous.catch(() => undefined).then(operation)
+  writeQueues.set(key, next)
+  // Evita que la cola crezca indefinidamente guardando cadenas ya terminadas.
+  void next.catch(() => undefined).finally(() => {
+    if (writeQueues.get(key) === next) writeQueues.delete(key)
+  })
+  return next
 }
 
 /**
@@ -65,9 +105,24 @@ async function writeAtomic(
         if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
       }
     }
-    await fs.writeFile(temp, content, { encoding: 'utf-8', mode: 0o600 })
+    // Volcado a disco ANTES del rename: sin fsync el rename puede ser durable y
+    // los datos no, así que un corte de corriente devuelve el fichero de notas
+    // truncado o a cero con el bueno ya sustituido.
+    const handle = await fs.open(temp, 'w', 0o600)
+    try {
+      await handle.writeFile(content, 'utf-8')
+      await handle.sync()
+    } finally {
+      await handle.close()
+    }
     if (mode !== 0o600) await fs.chmod(temp, mode)
     await fs.rename(temp, path)
+    // Y el directorio, para que el propio rename sobreviva al corte.
+    const dirHandle = await fs.open(dirname(path), 'r').catch(() => null)
+    if (dirHandle) {
+      await dirHandle.sync().catch(() => undefined)
+      await dirHandle.close()
+    }
   } catch (error) {
     await fs.unlink(temp).catch(() => undefined)
     throw error
@@ -232,20 +287,24 @@ export async function listClasses(): Promise<ClassRoster[]> {
 }
 
 export async function saveClass(roster: ClassRoster): Promise<ClassRoster[]> {
-  const list = await listClasses()
-  const idx = list.findIndex((c) => c.id === roster.id)
-  const now = Date.now()
-  const updated: ClassRoster = { ...roster, updatedAt: now, createdAt: roster.createdAt || now }
-  if (idx >= 0) list[idx] = updated
-  else list.push(updated)
-  await writeJson('classes.json', list)
-  return list.sort((a, b) => b.updatedAt - a.updatedAt)
+  return serialized('classes.json', async () => {
+    const list = await listClasses()
+    const idx = list.findIndex((c) => c.id === roster.id)
+    const now = Date.now()
+    const updated: ClassRoster = { ...roster, updatedAt: now, createdAt: roster.createdAt || now }
+    if (idx >= 0) list[idx] = updated
+    else list.push(updated)
+    await writeJson('classes.json', list)
+    return list.sort((a, b) => b.updatedAt - a.updatedAt)
+  })
 }
 
 export async function deleteClass(id: string): Promise<ClassRoster[]> {
-  const list = (await listClasses()).filter((c) => c.id !== id)
-  await writeJson('classes.json', list)
-  return list
+  return serialized('classes.json', async () => {
+    const list = (await listClasses()).filter((c) => c.id !== id)
+    await writeJson('classes.json', list)
+    return list
+  })
 }
 
 // ---- Récord histórico de notas (por proyecto) ----
@@ -268,15 +327,49 @@ function classScope(classId?: string): string {
   return classId ? `class:${classId}` : 'manual'
 }
 
+/**
+ * Fusiona claves que solo difieran en espacios sobrantes quedándose con el
+ * máximo. `tt_members` se leía crudo del YAML, así que «Ana García » y «Ana
+ * García» eran dos historiales distintos y el CSV podía llevarse el más bajo.
+ */
+function mergeTrimmedKeys(grades: GradeRecords): GradeRecords {
+  const merged: GradeRecords = {}
+  for (const [name, grade] of Object.entries(grades)) {
+    const key = name.trim()
+    merged[key] = key in merged ? Math.max(merged[key], grade) : grade
+  }
+  return merged
+}
+
 async function readRecords(dir: string): Promise<ScopedRecords | null> {
+  let raw: string
   try {
-    const parsed: unknown = JSON.parse(await fs.readFile(recordsPath(dir), 'utf-8'))
+    raw = await fs.readFile(recordsPath(dir), 'utf-8')
+  } catch (error) {
+    // Solo «no existe» es ausencia de historial. Un fichero ilegible no puede
+    // pasar por «no hay notas»: partiríamos de cero y la siguiente escritura
+    // borraría el historial de toda la clase.
+    if (isMissing(error)) return null
+    throw new Error(
+      `No se pudo leer el historial de notas: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+  if (!raw.trim()) return null
+  try {
+    const parsed: unknown = JSON.parse(raw)
     if (
       parsed && typeof parsed === 'object' &&
       (parsed as Partial<ScopedRecords>).version === 2 &&
       (parsed as Partial<ScopedRecords>).classes &&
       typeof (parsed as Partial<ScopedRecords>).classes === 'object'
-    ) return parsed as ScopedRecords
+    ) {
+      const scoped = parsed as ScopedRecords
+      for (const [scope, grades] of Object.entries(scoped.classes)) {
+        scoped.classes[scope] = mergeTrimmedKeys(grades)
+      }
+      if (scoped.legacy) scoped.legacy = mergeTrimmedKeys(scoped.legacy)
+      return scoped
+    }
     // Formato 1: un único mapa por proyecto. No sabemos de qué clase era cada
     // nota, así que lo preservamos aparte y jamás lo aplicamos a una clase.
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
@@ -284,10 +377,12 @@ async function readRecords(dir: string): Promise<ScopedRecords | null> {
       for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
         if (typeof value === 'number' && Number.isFinite(value)) legacy[key] = value
       }
-      return { version: 2, classes: {}, legacy }
+      return { version: 2, classes: {}, legacy: mergeTrimmedKeys(legacy) }
     }
-  } catch {
-    // Sin historial todavía.
+  } catch (error) {
+    throw new Error(
+      `El historial de notas está dañado y no se puede interpretar: ${error instanceof Error ? error.message : String(error)}`
+    )
   }
   return null
 }
@@ -306,28 +401,42 @@ export async function updateRecords(
   grades: GradeRecords,
   classId?: string
 ): Promise<PersistenceResult<GradeRecords>> {
-  const safeGrades = validatedRecords(grades)
-  const stored = (await readRecords(dir)) ?? { version: 2, classes: {} }
-  const scope = classScope(classId)
-  const current = {
-    ...(scope === 'manual' ? stored.legacy ?? {} : {}),
-    ...(stored.classes[scope] ?? {})
-  }
-  for (const [name, grade] of Object.entries(safeGrades)) {
-    if (!(name in current) || grade > current[name]) current[name] = grade
-  }
-  try {
-    stored.classes[scope] = current
-    await writeAtomic(recordsPath(dir), JSON.stringify(stored, null, 2))
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err)
-    return {
-      data: current,
-      persisted: false,
-      warning: `No se pudo guardar el historial de mejores notas: ${detail}`
+  const safeGrades = mergeTrimmedKeys(validatedRecords(grades))
+  return serialized(recordsPath(dir), async () => {
+    let stored: ScopedRecords
+    try {
+      stored = (await readRecords(dir)) ?? { version: 2, classes: {} }
+    } catch (err) {
+      // No se pudo leer el historial: escribir ahora lo sustituiría por solo
+      // las notas de esta pasada, que es justo lo que el récord existe para
+      // evitar. Mejor avisar y no tocar el fichero.
+      return {
+        data: safeGrades,
+        persisted: false,
+        warning: err instanceof Error ? err.message : String(err)
+      }
     }
-  }
-  return { data: current, persisted: true }
+    const scope = classScope(classId)
+    const current = {
+      ...(scope === 'manual' ? stored.legacy ?? {} : {}),
+      ...(stored.classes[scope] ?? {})
+    }
+    for (const [name, grade] of Object.entries(safeGrades)) {
+      if (!(name in current) || grade > current[name]) current[name] = grade
+    }
+    try {
+      stored.classes[scope] = current
+      await writeAtomic(recordsPath(dir), JSON.stringify(stored, null, 2))
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err)
+      return {
+        data: current,
+        persisted: false,
+        warning: `No se pudo guardar el historial de mejores notas: ${detail}`
+      }
+    }
+    return { data: current, persisted: true }
+  })
 }
 
 /**
@@ -339,25 +448,27 @@ export async function resetRecords(
   dir: string,
   classId?: string
 ): Promise<PersistenceResult<GradeRecords>> {
-  const stored = await readRecords(dir)
-  if (!stored) return { data: {}, persisted: true }
-  const scope = classScope(classId)
-  const previous = { ...(stored.classes[scope] ?? {}) }
-  delete stored.classes[scope]
-  // El historial legado (formato 1) solo alimenta el espacio manual; si el
-  // profesor lo reinicia, debe desaparecer también o reaparecería al leer.
-  if (scope === 'manual') delete stored.legacy
-  try {
-    await writeAtomic(recordsPath(dir), JSON.stringify(stored, null, 2))
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err)
-    return {
-      data: previous,
-      persisted: false,
-      warning: `No se pudo borrar el historial de mejores notas: ${detail}`
+  return serialized(recordsPath(dir), async () => {
+    const stored = await readRecords(dir)
+    if (!stored) return { data: {}, persisted: true }
+    const scope = classScope(classId)
+    const previous = { ...(stored.classes[scope] ?? {}) }
+    delete stored.classes[scope]
+    // El historial legado (formato 1) solo alimenta el espacio manual; si el
+    // profesor lo reinicia, debe desaparecer también o reaparecería al leer.
+    if (scope === 'manual') delete stored.legacy
+    try {
+      await writeAtomic(recordsPath(dir), JSON.stringify(stored, null, 2))
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err)
+      return {
+        data: previous,
+        persisted: false,
+        warning: `No se pudo borrar el historial de mejores notas: ${detail}`
+      }
     }
-  }
-  return { data: {}, persisted: true }
+    return { data: {}, persisted: true }
+  })
 }
 
 // ---- Metadatos del proyecto (clase activa, etc.) ----
@@ -367,17 +478,30 @@ function metaPath(dir: string): string {
 }
 
 export async function getProjectMeta(dir: string): Promise<ProjectMeta> {
+  let raw: string
   try {
-    const meta = JSON.parse(await fs.readFile(metaPath(dir), 'utf-8')) as ProjectMeta
-    return meta && typeof meta === 'object' ? meta : {}
+    raw = await fs.readFile(metaPath(dir), 'utf-8')
+  } catch (error) {
+    if (isMissing(error)) return {}
+    throw new Error(
+      `No se pudieron leer los datos del proyecto: ${error instanceof Error ? error.message : String(error)}`
+    )
+  }
+  try {
+    const meta: unknown = JSON.parse(raw)
+    // Un array también pasa el `typeof === 'object'`, y al fusionarlo produciría
+    // un fichero con claves numéricas haciéndose pasar por ProjectMeta.
+    return meta && typeof meta === 'object' && !Array.isArray(meta) ? (meta as ProjectMeta) : {}
   } catch {
     return {}
   }
 }
 
 export async function setProjectMeta(dir: string, meta: ProjectMeta): Promise<void> {
-  const current = await getProjectMeta(dir)
-  await writeAtomic(metaPath(dir), JSON.stringify({ ...current, ...meta }, null, 2))
+  await serialized(metaPath(dir), async () => {
+    const current = await getProjectMeta(dir)
+    await writeAtomic(metaPath(dir), JSON.stringify({ ...current, ...meta }, null, 2))
+  })
 }
 
 // ---- CSV de Moodle por clase ----
@@ -395,6 +519,15 @@ export async function writeClassCsv(
 ): Promise<string> {
   const outDir = join(dir, 'informes')
   await fs.mkdir(outDir, { recursive: true })
+  return serialized(outDir, () => writeCsvFile(outDir, className, classId, content))
+}
+
+async function writeCsvFile(
+  outDir: string,
+  className: string,
+  classId: string | undefined,
+  content: string
+): Promise<string> {
   // El identificador evita que dos clases llamadas igual se pisen entre sí.
   const suffix = classId ? `-${sanitizeFileName(classId, 'clase').slice(0, 8)}` : ''
   const filePath = join(outDir, `moodle-${sanitizeFileName(className, 'clase')}${suffix}.csv`)

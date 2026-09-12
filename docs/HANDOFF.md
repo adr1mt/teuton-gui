@@ -25,22 +25,36 @@ parar al final de cualquiera.
     en `runTeutonSync`, y `SIGTERM`/`SIGINT`/`SIGHUP` atendidas.
   - Aviso modal al cerrar la ventana con una corrección en curso.
   - Red de seguridad `uncaughtException`/`unhandledRejection` en main.
-- `npm run typecheck` y `npm test` (95 tests) en verde.
+- **Fase 2 — que no se pierda nada ni se quede en blanco**:
+  - Un fichero ilegible o dañado ya no pasa por «no hay datos»: antes, un
+    `classes.json` que no se podía abrir parecía «no hay clases» y el siguiente
+    guardado lo reescribía vacío (todos los grupos del centro), y un historial
+    de notas corrupto se sustituía por las notas de una sola pasada.
+  - `writeAtomic` hace `fsync` del fichero y del directorio, y las escrituras
+    sobre un mismo fichero van en cola: dos ciclos solapados ya no se pisan la
+    mejor nota ni el `lastRunClassId` del que depende el CSV.
+  - El error boundary envuelve toda la app (antes solo la vista: un fallo en la
+    barra lateral dejaba pantalla blanca) y «Reintentar» vuelve a Inicio en vez
+    de re-lanzar el mismo error.
+  - CSV de Moodle a prueba de fórmulas (`=`, `+`, `-`, `@`) y de `\r`; el fichero
+    exportado a mano se escribe atómico y 0600 como el resto.
+  - Los nombres se normalizan sin espacios sobrantes en `studentRows`, la fuente
+    única: «Ana García » ya no parte el historial en dos.
+  - La tabla de configuración se bloquea si el YAML está roto — un clic en
+    «añadir alumno» vaciaba la clase entera — y los identificadores con ceros a
+    la izquierda (`tt_moodle_id: 0012345`) sobreviven a editar cualquier celda.
+  - Notas negativas o no finitas ya no tiran la vista de Analíticas.
+- `npm run typecheck` y `npm test` (106 tests) en verde.
 
 ## In progress
 
-Fase 2 — que no se pierda nada ni se quede en blanco: `readJson` distinguiendo
-EACCES de ENOENT (hoy un `classes.json` ilegible borra todos los grupos),
-`fsync` y cola de escrituras en `store.ts`, error boundary completo, CSV de
-Moodle a prueba de fórmulas y `\r`, claves de récord sin espacios sobrantes,
-tabla de configuración en solo lectura si el YAML está roto, y `tt_moodle_id`
-con ceros a la izquierda que no se destroce al editar.
+Fase 3 — seguridad: confinar las rutas IPC a los proyectos abiertos de verdad,
+CSP real en el AppImage (hoy se entrega como cabecera y el renderer se carga con
+`file://`, donde no se aplica), `isTrustedSender` por ruta exacta, `openPath`
+limitado al proyecto y comprobación de que el binario elegido parece Teutón.
 
 ## Next
 
-- Fase 3 — seguridad: confinar las rutas IPC a los proyectos abiertos de verdad,
-  CSP real en el AppImage (hoy se entrega como cabecera y el renderer se carga
-  con `file://`, donde no se aplica), `isTrustedSender` por ruta exacta.
 - Fase 4 — UAT hostil: `teuton` falso con modos de fallo, Playwright sobre el
   Electron real, proyectos deliberadamente corruptos y `docs/UAT.md`.
 - Fase 5 — reinstalar, verificar en la app instalada y cerrar.

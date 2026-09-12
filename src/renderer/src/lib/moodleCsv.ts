@@ -3,8 +3,14 @@ import { studentRows } from './analytics'
 import { bestScore, convertGrade } from './grading'
 
 function escapeCsv(v: string): string {
-  // Evita que comas/comillas rompan el CSV de Moodle.
-  return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
+  // El \r cuenta: un nombre con un retorno de carro suelto (el YAML lo conserva)
+  // dejaba un campo sin entrecomillar con un salto dentro, y Moodle leía una
+  // fila partida.
+  const quoted = /[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
+  // Un campo que empieza por = + - @ o tabulador lo ejecuta LibreOffice/Excel
+  // como fórmula al abrir el CSV. Se neutraliza con un apóstrofo inicial; los
+  // identificadores de Moodle y los nombres reales nunca empiezan así.
+  return /^[=+\-@\t]/.test(v) ? `"'${v.replace(/"/g, '""')}"` : quoted
 }
 
 /**

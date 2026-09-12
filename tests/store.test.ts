@@ -60,3 +60,53 @@ describe('persistencia de metadatos del proyecto', () => {
     })
   })
 })
+
+describe('un fichero ilegible no puede borrar datos', () => {
+  it('no reescribe el historial si no se puede leer', async () => {
+    const dir = join(tmpdir(), `teuton-records-${randomUUID()}`)
+    temporary.push(dir)
+    await fs.mkdir(dir, { recursive: true })
+    const file = join(dir, '.teuton-gui-records.json')
+    await fs.writeFile(file, '{ esto no es JSON', 'utf-8')
+
+    const outcome = await updateRecords(dir, { Ana: 40 }, 'clase-1')
+
+    // Partir de cero y escribir habría sustituido el historial de la clase por
+    // las notas de esta única pasada, que es justo lo que el récord evita.
+    expect(outcome.persisted).toBe(false)
+    expect(outcome.warning).toMatch(/dañado|no se pudo leer/i)
+    expect(await fs.readFile(file, 'utf-8')).toBe('{ esto no es JSON')
+  })
+
+  it('fusiona las notas cuyo nombre solo difiere en espacios sobrantes', async () => {
+    const dir = join(tmpdir(), `teuton-records-${randomUUID()}`)
+    temporary.push(dir)
+    await fs.mkdir(dir, { recursive: true })
+    await fs.writeFile(
+      join(dir, '.teuton-gui-records.json'),
+      JSON.stringify({ version: 2, classes: { 'class:c1': { 'Ana Ferrer': 90, 'Ana Ferrer ': 30 } } }),
+      'utf-8'
+    )
+
+    const records = await getRecords(dir, 'c1')
+
+    expect(Object.keys(records)).toEqual(['Ana Ferrer'])
+    expect(records['Ana Ferrer']).toBe(90)
+  })
+
+  it('dos actualizaciones a la vez no se pisan la mejor nota', async () => {
+    const dir = join(tmpdir(), `teuton-records-${randomUUID()}`)
+    temporary.push(dir)
+    await fs.mkdir(dir, { recursive: true })
+
+    // Sin cola, ambas leen el mismo fichero vacío y la última escritura gana:
+    // la clase que terminó antes perdía sus notas.
+    await Promise.all([
+      updateRecords(dir, { Ana: 80 }, 'clase-a'),
+      updateRecords(dir, { Bruno: 60 }, 'clase-b')
+    ])
+
+    expect(await getRecords(dir, 'clase-a')).toEqual({ Ana: 80 })
+    expect(await getRecords(dir, 'clase-b')).toEqual({ Bruno: 60 })
+  })
+})

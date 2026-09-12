@@ -40,7 +40,21 @@ const NAV: { id: View; label: string; icon: typeof Home; needsProject?: boolean 
   { id: 'help', label: t.nav.help, icon: HelpCircle }
 ]
 
+/**
+ * El límite de errores envuelve TODA la aplicación, no solo la vista. Un fallo en
+ * la barra lateral (el estado del modo examen se pinta ahí) o en el aviso
+ * superior escapaba de `ViewErrorBoundary` y dejaba la pantalla en blanco a
+ * mitad de examen, sin más salida que reiniciar la app y perder el modo examen.
+ */
 export default function App() {
+  return (
+    <AppErrorBoundary>
+      <AppBody />
+    </AppErrorBoundary>
+  )
+}
+
+function AppBody() {
   const { theme, view, setView, toggleTheme, project, teutonStatus, setTeutonStatus, dirty } =
     useApp()
   const setGrading = useApp((s) => s.setGrading)
@@ -223,7 +237,16 @@ export default function App() {
   }
 }
 
-class ViewErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+interface BoundaryProps {
+  children: ReactNode
+  title: string
+  /** Qué hacer antes de volver a intentar pintar; sin esto, un fallo
+   *  determinista vuelve a lanzar en cuanto se reintenta. */
+  onRetry?: () => void
+  retryLabel: string
+}
+
+class ErrorCard extends Component<BoundaryProps, { error: Error | null }> {
   state: { error: Error | null } = { error: null }
 
   static getDerivedStateFromError(error: Error): { error: Error } {
@@ -231,24 +254,52 @@ class ViewErrorBoundary extends Component<{ children: ReactNode }, { error: Erro
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
-    console.error('Error al renderizar la vista', error, info)
+    console.error('Error al renderizar', error, info)
   }
 
   render(): ReactNode {
     if (!this.state.error) return this.props.children
     return (
-      <div role="alert" className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center">
+      <div role="alert" className="flex h-full flex-col items-center justify-center gap-3 bg-background px-8 text-center">
         <AlertTriangle className="h-8 w-8 text-destructive-strong" />
-        <h1 className="font-semibold">Esta vista no se pudo mostrar</h1>
+        <h1 className="font-semibold">{this.props.title}</h1>
         <p className="max-w-xl text-sm text-muted-foreground">{this.state.error.message}</p>
+        <p className="max-w-xl text-xs text-muted-foreground">
+          Las notas ya guardadas están a salvo en el historial del proyecto.
+        </p>
         <button
           type="button"
-          onClick={() => this.setState({ error: null })}
+          onClick={() => {
+            this.props.onRetry?.()
+            this.setState({ error: null })
+          }}
           className="rounded-md border border-input px-3 py-2 text-sm hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          Reintentar
+          {this.props.retryLabel}
         </button>
       </div>
     )
   }
+}
+
+function ViewErrorBoundary({ children }: { children: ReactNode }) {
+  return (
+    <ErrorCard
+      title="Esta vista no se pudo mostrar"
+      retryLabel="Volver a Inicio"
+      // Reintentar sin cambiar nada volvía a lanzar el mismo error (p.ej. una
+      // nota imposible en resume.json): se sale de la vista que falla.
+      onRetry={() => useApp.getState().setView('home')}
+    >
+      {children}
+    </ErrorCard>
+  )
+}
+
+function AppErrorBoundary({ children }: { children: ReactNode }) {
+  return (
+    <ErrorCard title="La aplicación no se pudo mostrar" retryLabel="Reintentar">
+      {children}
+    </ErrorCard>
+  )
 }

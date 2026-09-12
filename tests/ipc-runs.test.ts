@@ -29,7 +29,7 @@ class FakeChild extends EventEmitter {
   }
 
   /** Termina como lo haría el proceso real: primero 'exit', luego 'close'. */
-  finish(code = 0): void {
+  finish(code: number | null = 0): void {
     this.exitCode = code
     this.emit('exit', code, null)
     this.emit('close', code, null)

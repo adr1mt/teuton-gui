@@ -49,6 +49,28 @@ describe('buildMoodleCsv', () => {
     expect(line.startsWith('"Sanz, Ana ""La Jefa"""')).toBe(true)
   })
 
+  it('neutraliza los nombres que LibreOffice interpretaría como fórmula', () => {
+    const res = loadedResults({ resumeCases: [resumeCase('01', '=1+1', 100)] })
+    const line = buildMoodleCsv(res, {}, grading).split('\n')[1]
+    // Sin el apóstrofo, abrir el CSV de notas ejecuta la celda como fórmula.
+    expect(line.startsWith('"\'=1+1"')).toBe(true)
+  })
+
+  it('entrecomilla un retorno de carro dentro del nombre', () => {
+    const res = loadedResults({ resumeCases: [resumeCase('01', 'Ana\rGarcía', 100)] })
+    const line = buildMoodleCsv(res, {}, grading)
+    // Sin entrecomillar, Moodle leería la fila partida en dos.
+    expect(line).toContain('"Ana\rGarcía"')
+  })
+
+  it('usa el récord aunque el nombre del config llevara espacios sobrantes', () => {
+    const res = loadedResults({ resumeCases: [resumeCase('01', '  Ana Ferrer  ', 30)] })
+    const line = buildMoodleCsv(res, { 'Ana Ferrer': 90 }, grading).split('\n')[1]
+    expect(line.startsWith('Ana Ferrer,')).toBe(true)
+    // 90 puntos con umbral 70 y máximo 10 → notable, no el 30 de esta pasada.
+    expect(line.split(',')[1]).not.toBe('2.14')
+  })
+
   it('siempre lleva cabecera y salto final', () => {
     const csv = buildMoodleCsv(loadedResults({}), {}, grading)
     expect(csv).toBe('MoodleID,Nota,Feedback\n')

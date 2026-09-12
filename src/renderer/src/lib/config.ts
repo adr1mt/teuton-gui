@@ -30,15 +30,61 @@ function normalizeKeys(obj: unknown): Record<string, unknown> {
   return out
 }
 
+/**
+ * Recupera el texto original de los escalares que `yaml.load` convirtió en
+ * número perdiendo información: `tt_moodle_id: 0012345` se lee como 12345 y
+ * `stringifyConfig` reescribía el fichero con el identificador destrozado en
+ * cuanto se tocaba cualquier celda de la tabla (también `007`, `1.50` y los
+ * dígitos por encima de 2^53).
+ *
+ * Solo se sustituye cuando el texto y el número NO coinciden, así que un
+ * `host1_port: 22` normal sigue siendo número y el fichero no se llena de
+ * comillas. Los booleanos y los nulos se leen del parseo normal, porque Teutón
+ * sí los distingue (`tt_skip`, `tt_sequence`) y el esquema FAILSAFE los daría
+ * como texto.
+ */
+function preserveScalarText(
+  parsed: Record<string, unknown>,
+  raw: Record<string, unknown>
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...parsed }
+  for (const [key, value] of Object.entries(parsed)) {
+    const text = raw[key]
+    if (typeof value === 'number' && typeof text === 'string' && text.trim() !== String(value)) {
+      out[key] = text.trim()
+    }
+  }
+  return out
+}
+
+/** El mismo documento leído sin resolver tipos: todo escalar es su texto literal. */
+function loadRawScalars(text: string): Record<string, unknown> {
+  try {
+    return normalizeKeys(yaml.load(text, { schema: yaml.FAILSAFE_SCHEMA }) || {})
+  } catch {
+    return {}
+  }
+}
+
 /** Parsea el YAML de config a un modelo manejable. Tolerante a errores. */
 export function parseConfig(text: string): { config: TeutonConfig; error: string | null } {
   try {
     const raw = (yaml.load(text) || {}) as Record<string, unknown>
     const rawNormalized = normalizeKeys(raw)
 
-    const global = normalizeKeys(rawNormalized.global) as TeutonConfig['global']
+    // `extra` (secciones que la interfaz no edita) se deja tal cual venía del
+    // parseo normal: se vuelca byte a byte y no debe ganar comillas nuevas.
+    const literal = loadRawScalars(text)
+    const literalCases = Array.isArray(literal.cases) ? literal.cases.map((c) => normalizeKeys(c)) : []
+
+    const global = preserveScalarText(
+      normalizeKeys(rawNormalized.global),
+      normalizeKeys(literal.global)
+    ) as TeutonConfig['global']
     const casesRaw = Array.isArray(rawNormalized.cases) ? rawNormalized.cases : []
-    const cases = casesRaw.map((c) => normalizeKeys(c) as ConfigCase)
+    const cases = casesRaw.map(
+      (c, i) => preserveScalarText(normalizeKeys(c), literalCases[i] ?? {}) as ConfigCase
+    )
 
     const extra: Record<string, unknown> = {}
     for (const [k, v] of Object.entries(rawNormalized)) {

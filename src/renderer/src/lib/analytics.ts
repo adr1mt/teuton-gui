@@ -44,7 +44,9 @@ export function studentRows(results: LoadedResults, passScore = 50): StudentRow[
       const counts = countTargets(c)
       return {
         id: rc.id,
-        members: rc.members,
+        // Nombre sin espacios sobrantes: es la clave del récord histórico y del
+        // CSV de Moodle, y «Ana García » partía el historial en dos.
+        members: rc.members.trim(),
         grade: rc.grade,
         state: rc.state,
         connErrors: Object.keys(rc.connErrors).length,
@@ -58,7 +60,7 @@ export function studentRows(results: LoadedResults, passScore = 50): StudentRow[
     const counts = countTargets(c)
     return {
       id: c.caseId,
-      members: c.members,
+      members: c.members.trim(),
       grade: c.grade,
       state: c.grade >= 100 ? '✓' : c.grade < passScore ? '✗' : '~',
       connErrors: 0,
@@ -254,8 +256,11 @@ export function gradeDistribution(rows: StudentRow[]): DistBucket[] {
     buckets.push({ label: `${lo}-${hi}`, count: 0 })
   }
   for (const r of rows) {
-    const idx = Math.min(9, Math.floor(r.grade / 10))
-    buckets[idx].count++
+    // Acotado por los dos lados: una nota negativa o no finita en resume.json
+    // daba un índice fuera del array y lanzaba durante el render, dejando toda
+    // la vista de Analíticas en el error boundary.
+    const raw = Number.isFinite(r.grade) ? Math.floor(r.grade / 10) : 0
+    buckets[Math.min(9, Math.max(0, raw))].count++
   }
   return buckets
 }

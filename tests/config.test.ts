@@ -97,3 +97,29 @@ describe('caseColumns e isSecretColumn', () => {
     expect(isSecretColumn('host1_ip')).toBe(false)
   })
 })
+
+describe('identificadores que no se deben estropear', () => {
+  it('conserva los ceros a la izquierda de tt_moodle_id al editar la tabla', () => {
+    const { config } = parseConfig('---\ncases:\n  - tt_members: ana\n    tt_moodle_id: 0012345\n')
+    expect(config.cases[0].tt_moodle_id).toBe('0012345')
+    // Y al volcar de vuelta sigue siendo el mismo identificador, no 12345.
+    expect(stringifyConfig(config)).toContain("'0012345'")
+  })
+
+  it('conserva una contraseña numérica larga sin perder precisión', () => {
+    const { config } = parseConfig('---\nglobal:\n  host1_password: 123456789012345678901\n')
+    expect(config.global.host1_password).toBe('123456789012345678901')
+  })
+
+  it('no llena de comillas los números que no pierden nada', () => {
+    const { config } = parseConfig('---\nglobal:\n  host1_port: 22\n')
+    expect(config.global.host1_port).toBe(22)
+    expect(stringifyConfig(config)).toContain('host1_port: 22')
+  })
+
+  it('no convierte en texto los booleanos que Teutón sí distingue', () => {
+    const { config } = parseConfig('---\nglobal:\n  tt_sequence: false\ncases:\n  - tt_skip: true\n')
+    expect(config.global.tt_sequence).toBe(false)
+    expect(config.cases[0].tt_skip).toBe(true)
+  })
+})

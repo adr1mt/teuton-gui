@@ -184,3 +184,22 @@ describe('frequentErrors / groupSuccess / gradeDistribution', () => {
     expect(dist[9]).toEqual({ label: '90-100', count: 1 })
   })
 })
+
+describe('robustez de la distribución de notas', () => {
+  it('no lanza con notas fuera de rango ni no finitas', () => {
+    const rows = [
+      { grade: -25 },
+      { grade: 150 },
+      { grade: Number.NaN },
+      { grade: 100 },
+      { grade: 0 }
+    ] as StudentRow[]
+    // Antes, un índice negativo accedía a buckets[-1] y lanzaba DENTRO del
+    // render, dejando toda la vista de Analíticas en el error boundary.
+    const dist = gradeDistribution(rows)
+    expect(dist).toHaveLength(10)
+    expect(dist.reduce((sum, b) => sum + b.count, 0)).toBe(rows.length)
+    expect(dist[0].count).toBe(3) // negativa, NaN y 0 caen en el primer tramo
+    expect(dist[9].count).toBe(2) // 100 y 150
+  })
+})
