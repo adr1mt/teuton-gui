@@ -52,6 +52,8 @@ perder datos; lo siguiente debe salir de usar la app en clase.
   del escritorio no responde, la app usaba usuario/usuario y eso solo se veía en
   el log: la tabla parecía correcta. Ahora lo dice en pantalla, y también avisa
   cuando se guardan sin cifrar por no haber llavero.
+- `test-results/` (salida de Playwright) ya no se versiona: ensuciaba cada
+  pasada de tests con cambios falsos. Ignorada junto a `playwright-report/`.
 
 ## In progress
 
