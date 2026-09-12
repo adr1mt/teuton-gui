@@ -19,7 +19,9 @@ he sees on screen during an exam. Explain in those terms, not in code terms.
 
 ## Finish every change with these three
 
-1. **`npm run typecheck && npm test`** — before considering any change done.
+1. **`npm run typecheck && npm test`** — before considering any change done. If the change touches the
+   run lifecycle, the exam loop, the trust boundary or the packaging, `npm run test:e2e` too (it drives
+   the real app, so it needs a `DISPLAY`; `dist/linux-unpacked` must exist for the packaged scenario).
 2. **`./scripts/instalar.sh`**, and say so in the summary. He opens the app from the desktop menu, never
    from a terminal, so an un-reinstalled change is invisible: he would be testing the previous build
    without knowing it. The menu entry (`~/.local/share/applications/teuton-gui.desktop`) points at
@@ -39,6 +41,8 @@ npm install                # install deps
 npm run dev                # electron-vite dev server with HMR
 npm run typecheck          # tsc --noEmit for main/preload, renderer AND tests
 npm test                   # vitest run — unit tests in tests/
+npm run test:e2e           # playwright — UAT hostil sobre la app real (needs a DISPLAY)
+npm run screenshot         # captura la app real en /tmp/teuton-shot.png
 npm run build              # electron-vite build -> out/
 npm run dist:linux         # build + electron-builder (AppImage + deb) -> dist/
 npm run icon               # regenerates build/icon.png + build/icons/*.png (pure-Python, no deps)
@@ -69,10 +73,16 @@ imports `electron` or renders React is out of scope for these tests** — use th
 npm run verify:parsing -- <path/to/a/project/already/run>
 ```
 
-`scripts/screenshot.ts` boots the real app in Electron and captures a PNG — the standard way to visually
-verify a change end-to-end when no display-driving tool is available. Bundle it the same way with esbuild
-(`--external:electron`) and run with `node_modules/electron/dist/electron /tmp/out.mjs --no-sandbox` under
-a real `DISPLAY`.
+**Hostile UAT** (`tests/e2e/`, `npm run test:e2e`). Playwright drives the real app; `scripts/fake-teuton.mjs`
+stands in for the CLI with failure modes real machines can't be asked to reproduce (`FAKE_TEUTON_MODE`:
+`hang`, `crash`, `truncate`, `noresume`, `huge`, `slow`, `notargets`, `badgrades`). Every scenario gets its
+own temporary `userData` and project, so **the UAT never touches the teacher's real classes or settings**.
+Orphan processes are detected through the pidfiles the fake binary writes, not `pgrep -f`, whose pattern
+also matches the command line of whoever is searching. See `docs/UAT.md` for the list of attacks and the
+six checks that still need a human.
+
+`npm run screenshot` boots the real app in Electron and captures a PNG (`/tmp/teuton-shot.png`, or
+`SHOT_OUT`) — useful to eyeball a visual change. It needs a real `DISPLAY`, like the e2e suite.
 
 To unit-exercise `main/store.ts` (records/CSV logic) outside Electron, bundle a throwaway script with
 `--alias:electron=<stub>.ts` where the stub exports `app = { getPath: () => '/tmp' }` — plain `node` can
@@ -120,6 +130,9 @@ Each of these has a bug behind it. Read the one that covers what you are about t
 | the editor, drafts, launching a run | Draft-vs-disk consistency |
 | the dashboard matrix, analytics, report loading | Corrupt `case-NN.json` |
 | invoking the `teuton` binary | PATH discovery |
+| any IPC handler that takes a path | Confined project paths |
+| the CSP, `index.html`, the vite config | CSP lives in two places |
+| the e2e suite, `scripts/fake-teuton.mjs` | Hostile UAT |
 
 **Config file colon-symbol format** (`lib/config.ts`). Teutón's config YAML is read by Ruby's `YAML.load`,
 which accepts both `tt_members: x` and the legacy Ruby-symbol style `:tt_members: x` (keys/values prefixed
@@ -128,6 +141,14 @@ a literal string key, silently breaking the visual table for anyone with an olde
 `parseConfig`/`stringifyConfig` normalize prefixed keys on read and always write back in modern (no-colon)
 style, while any *other* top-level section the UI doesn't edit (`alias`, `macros`, `tt_include`, …) is kept
 in `TeutonConfig.extra` and passed through byte-for-byte on save so it's never silently dropped.
+`preserveScalarText` additionally re-reads the document with `FAILSAFE_SCHEMA` and restores the literal
+text of any scalar `yaml.load` turned into a *lossy* number: `tt_moodle_id: 0012345` parses as 12345, and
+the next table keystroke rewrote the file with the identifier destroyed (same for `007`, `1.50` and
+anything past 2^53). Only mismatching values are replaced, so `host1_port: 22` stays a number and the file
+doesn't fill up with quotes, and booleans/nulls come from the normal parse because Teutón distinguishes
+them (`tt_skip`, `tt_sequence`). The table itself refuses to `emit()` while the YAML is unparseable —
+`parseConfig` returns an *empty* config on error, so one click on "add student" used to write `cases: []`
+over the whole class.
 
 **Background execution & the "modo examen" loop** (`lib/run.ts`). Run state lives in the global Zustand
 store (`useApp.getState().run`), not component state, specifically so navigating away from the Run tab
@@ -140,7 +161,14 @@ ignored). "Modo examen" (`startMonitor`/`stopMonitor`) re-invokes `startRun` on 
 `setInterval`) so cycles never overlap. The chain's invariant is *monitor.active ⇒ a next cycle is
 scheduled*: every path that ends a cycle — normal exit (`loadAfterExit`), cancellation (`cancelRun`), and
 both startup-failure branches in `startRun` — must call `scheduleNextCycle`, or the monitor silently dies
-while still showing "active".
+while still showing "active". Two things guard that invariant: `startRun` **claims the slot
+synchronously** (setting `run.status` before the `await` of `saveDraftsIfDirty`, because two starts in the
+same tick otherwise both passed the guard and the second orphaned the first process), and
+`checkMonitorHealth` — a 30 s watchdog mounted in `useRunManager` — restarts a cycle that never got
+scheduled. The watchdog exists for what code alone can't fix: an `ssh` that hangs and never emits `exit`,
+and a suspended laptop, where the timer doesn't run and the countdown freezes at `0:00`. Leaving the
+project goes through `leaveProject()` (cancels the child, stops the timer); the store resetting `run` on
+its own only forgot the process, which kept evaluating the previous class and blocked the next run.
 
 **Live progress bar** (`lib/progress.ts`). Teutón doesn't report machine-readable progress. It prints one
 character per check to stdout between the `Started at` and `Finished in` lines: `.` (pass), `F` (fail), `S`
@@ -206,6 +234,33 @@ made the student vanish from the matrix, the analytics and the student detail wh
 active, which is what produced the interleaved write in the first place. For the same reason `buildMatrix`
 takes `StudentRow[]`, not `LoadedResults`: matrix columns come from the *same* rows as the list view, so a
 missing or unreadable case report shows a `?` column instead of removing the student.
+
+**Confined project paths** (`main/ipc.ts`). `validatedPath` normalizes but does not confine — `resolve()`
+collapses `..`, it doesn't forbid it — so every handler taking a directory used to accept any absolute
+path on disk. `allowedRoots` holds the directories the teacher actually chose: whatever `pickDirectory`
+returned, and every entry handed out by `recentProjects` (which the Home view calls before anything is
+clickable, so the list is authorized in time). `projectDir()` requires the path to be inside one of them.
+It is defence in depth, not a live hole — there is no `innerHTML`, `eval` or `new Function` anywhere in
+`src/` — but `saveProject` was otherwise an arbitrary 10 MB write with a caller-chosen filename, and
+`openPath` fed `xdg-open`, which *executes* a `.desktop` file.
+
+**CSP lives in two places, and they must agree** (`main/index.ts`, `electron.vite.config.ts`). In
+development it is an HTTP header from main, because Vite's React preamble is an inline `<script>` that
+needs `'unsafe-inline'` in `script-src`. In the packaged app the renderer loads over `file://`, where
+`webRequest.onHeadersReceived` never fires — the strict policy simply wasn't applied in the build the
+teacher runs — so `inlineCsp` injects it as a `<meta>` at build time. `base-uri`, `form-action` and
+`object-src` are spelled out because they do not inherit from `default-src`. The packaged case is covered
+by `tests/e2e/empaquetada.spec.ts`, the only test where `app.isPackaged` is true.
+
+**Writes are queued and durable** (`main/store.ts`). `writeAtomic` fsyncs the temp file *and* its
+directory before/after the rename: without that the rename can be durable while the data is not, and the
+grade record comes back truncated with the good copy already gone. Every read-modify-write
+(`updateRecords`, `resetRecords`, `setProjectMeta`, `saveClass`, `deleteClass`, `writeClassCsv`) goes
+through `serialized()`, a per-file promise chain — the renderer fires these in parallel and two
+overlapping cycles used to lose one class's best grade, or the `lastRunClassId` the CSV depends on.
+Related: **only ENOENT counts as "no data"**. `readJson` and `readRecords` propagate every other failure,
+because swallowing EACCES made an unreadable `classes.json` look like "no classes" and the next save
+rewrote it empty, taking every roster in the school with it.
 
 **PATH discovery for `teuton`** (`main/teuton.ts`). Desktop apps often start with a minimal `PATH` that
 excludes Ruby gem bin directories. `teutonEnv()` resolves a login shell's `PATH` once and additionally

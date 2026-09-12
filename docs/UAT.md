@@ -6,7 +6,7 @@ clase aparecen una vez y no se pueden reproducir a voluntad: una máquina que no
 responde, dos ciclos que se pisan, un informe a medio escribir.
 
 ```bash
-npm run test:e2e          # los 14 escenarios sobre la app real
+npm run test:e2e          # los 15 escenarios sobre la app real
 npm test                  # 112 tests unitarios
 npm run verify:parsing -- <proyecto ya ejecutado>
 ```
@@ -43,6 +43,7 @@ npm run verify:parsing -- <proyecto ya ejecutado>
 | 12 | CSP en el HTML empaquetado | `<meta>` presente y un `<script>` inline no se ejecuta |
 | 13 | Rutas fuera del proyecto por el puente IPC | Rechazadas (`loadResults`, `saveProject`, `openPath`, `..`) |
 | 14 | Fijar `/bin/ls` como Teutón | Rechazado: «no responde como Teutón» |
+| 15 | La app **empaquetada** (`dist/linux-unpacked`) | Arranca con ventana y con `window.teuton`; la CSP bloquea un script inline |
 
 Y en los tests unitarios: `classes.json` sin permisos de lectura (las clases no
 pueden desaparecer ni sobreescribirse), 300 alumnos, dos guardados a la vez,
@@ -72,6 +73,11 @@ hacerlas sobre el **AppImage instalado**, no sobre el build de desarrollo.
    guardar proyecto, récords y CSV deben avisar, no fallar en silencio.
 3. **Suspender el portátil 10 minutos con el modo examen activo.** Al despertar,
    el vigilante reanuda el ciclo en menos de 30 s en vez de quedarse en `0:00`.
+El escenario 15 es el único donde `app.isPackaged` es cierto, así que es el único
+que prueba de verdad el preload CommonJS y la CSP incrustada. Necesita haber
+empaquetado antes (`npm run dist:linux` o `./scripts/instalar.sh --forzar`); si no
+hay build, se salta.
+
 4. **Cerrar la ventana con una corrección en marcha.** Sale el aviso modal; al
    confirmar no queda ningún `teuton` ni `ssh` vivo (`ps aux | grep teuton`).
 5. **Cerrar la sesión del escritorio** con una evaluación en curso: tampoco

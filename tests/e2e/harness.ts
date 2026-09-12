@@ -86,7 +86,7 @@ export async function launchApp(options: LaunchOptions = {}): Promise<Session> {
     } as Record<string, string>
   })
   const page = await app.firstWindow()
-  await page.waitForSelector('text=Proyectos recientes', { timeout: 20_000 })
+  await page.waitForSelector('main >> text=Proyectos recientes', { timeout: 20_000 })
 
   const session: Session = {
     app,

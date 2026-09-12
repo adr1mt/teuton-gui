@@ -2,84 +2,59 @@
 
 ## Objective
 
-Tanda de endurecimiento sobre la 1.0.0: robustez, seguridad y una UAT hostil que
-intente romper la app. No entran funciones nuevas. Plan en 5 fases; se puede
-parar al final de cualquiera.
+Tanda de endurecimiento sobre la 1.0.0: robustez, seguridad y una UAT hostil.
+Terminada. Lo siguiente debe salir de usar la app en un examen real.
 
 ## Completed
 
 - 1.0.0 publicada con `.deb` y `.AppImage`:
   <https://github.com/adr1mt/teuton-gui/releases/tag/v1.0.0>
-- **Fase 1 — ciclo de vida del examen**:
-  - La invariante «modo examen activo ⇒ hay ciclo programado» ya no se pierde:
-    ceder el turno a una ejecución en vuelo reprograma (antes el monitor moría
-    en silencio mostrando «activo»), y un vigilante de 30 s reanuda el bucle si
-    se quedó parado (`ssh` colgado que nunca termina, portátil suspendido).
-  - `leaveProject()`: abrir o crear otro proyecto cancela de verdad la ejecución
-    anterior y para el temporizador, con confirmación si hay examen en marcha.
-    Antes el proceso seguía vivo, sus resultados se perdían y main rechazaba la
-    siguiente ejecución sobre ese directorio.
-  - Sin procesos huérfanos: reserva del directorio *antes* de lanzar (cierra el
-    doble clic en «Ejecutar»), cancelación que espera a la muerte real del hijo,
-    los hijos de `check`/`export` registrados para morir al salir, grupo propio
-    en `runTeutonSync`, y `SIGTERM`/`SIGINT`/`SIGHUP` atendidas.
-  - Aviso modal al cerrar la ventana con una corrección en curso.
-  - Red de seguridad `uncaughtException`/`unhandledRejection` en main.
-- **Fase 2 — que no se pierda nada ni se quede en blanco**:
-  - Un fichero ilegible o dañado ya no pasa por «no hay datos»: antes, un
-    `classes.json` que no se podía abrir parecía «no hay clases» y el siguiente
-    guardado lo reescribía vacío (todos los grupos del centro), y un historial
-    de notas corrupto se sustituía por las notas de una sola pasada.
-  - `writeAtomic` hace `fsync` del fichero y del directorio, y las escrituras
-    sobre un mismo fichero van en cola: dos ciclos solapados ya no se pisan la
-    mejor nota ni el `lastRunClassId` del que depende el CSV.
-  - El error boundary envuelve toda la app (antes solo la vista: un fallo en la
-    barra lateral dejaba pantalla blanca) y «Reintentar» vuelve a Inicio en vez
-    de re-lanzar el mismo error.
-  - CSV de Moodle a prueba de fórmulas (`=`, `+`, `-`, `@`) y de `\r`; el fichero
-    exportado a mano se escribe atómico y 0600 como el resto.
-  - Los nombres se normalizan sin espacios sobrantes en `studentRows`, la fuente
-    única: «Ana García » ya no parte el historial en dos.
-  - La tabla de configuración se bloquea si el YAML está roto — un clic en
-    «añadir alumno» vaciaba la clase entera — y los identificadores con ceros a
-    la izquierda (`tt_moodle_id: 0012345`) sobreviven a editar cualquier celda.
-  - Notas negativas o no finitas ya no tiran la vista de Analíticas.
-- `npm run typecheck` y `npm test` (106 tests) en verde.
-
-- **Fase 3 — seguridad** (defensa en profundidad: no hay `innerHTML` ni `eval`
-  en el renderer, que solo carga contenido propio):
-  - Las rutas están confinadas a los proyectos que el profesor ha abierto de
-    verdad (selector del sistema o lista de recientes). Antes, los 14 handlers
-    con directorio aceptaban cualquier ruta del disco: `saveProject` era una
-    escritura arbitraria y `openPath` un `xdg-open` de lo que fuera.
-  - CSP de verdad en la app instalada: se incrusta como `<meta>` al compilar
-    (`inlineCsp`). La cabecera HTTP del proceso main no llegaba nunca al AppImage
-    porque el renderer se carga con `file://`, donde `webRequest` no interviene.
-    Añadidas `base-uri`, `form-action` y `object-src`, que no heredan.
-  - `isTrustedSender` compara la ruta real del renderer, no el final de la URL.
-  - `fileName` rechaza `..` y ficheros ocultos; la ruta manual de Teutón en
-    Ajustes se comprueba (`teuton version`) antes de quedar fijada.
-- `npm run typecheck` y `npm test` (107 tests) en verde.
+- **Ciclo de vida del examen**: el modo examen ya no puede morir en silencio
+  mostrando «activo» (reserva síncrona del turno + vigilante de 30 s que reanuda
+  el bucle tras un `ssh` colgado o una suspensión); cambiar de proyecto cancela
+  de verdad la ejecución anterior, con confirmación; sin procesos huérfanos
+  (reserva antes de lanzar, cancelación que espera la muerte real del hijo,
+  hijos de `check`/`export` registrados, señales del sistema atendidas); aviso
+  modal al cerrar la ventana con una corrección en curso; red de seguridad
+  `uncaughtException`/`unhandledRejection`.
+- **Datos**: un fichero ilegible ya no pasa por «no hay datos» (antes un
+  `classes.json` sin permisos se reescribía vacío y se llevaba todos los
+  grupos); `fsync` y cola de escrituras; error boundary en toda la app; CSV a
+  prueba de fórmulas y `\r`; nombres normalizados sin espacios sobrantes; tabla
+  de configuración bloqueada si el YAML está roto; `tt_moodle_id: 0012345`
+  sobrevive a editar la tabla; notas imposibles no tiran Analíticas.
+- **Seguridad**: rutas IPC confinadas a los proyectos abiertos de verdad; CSP
+  incrustada en el HTML al compilar (la cabecera nunca llegaba al AppImage, que
+  carga con `file://`); `isTrustedSender` por ruta exacta; `..` y ficheros
+  ocultos rechazados; la ruta manual de Teutón se comprueba antes de fijarla.
+- **UAT hostil**: `scripts/fake-teuton.mjs` (modos `hang`, `crash`, `truncate`,
+  `noresume`, `huge`, `slow`, `notargets`, `badgrades`) + Playwright sobre la app
+  real, con `userData` y proyecto temporales. Encontró un fallo real: dos
+  arranques en el mismo tick dejaban huérfano el proceso del primero.
+- Verificado: `npm run typecheck`, `npm test` (112), `npm run test:e2e` (15) y
+  `./scripts/instalar.sh --forzar`. El escenario 15 prueba el AppImage ya
+  empaquetado: arranca con ventana y la CSP bloquea un script inline.
+- Comprobado de paso: el `files` de electron-builder no mete dependencias de
+  desarrollo (los recursos empaquetados pesan 7,5 MB).
 
 ## In progress
 
-Fase 4 — UAT hostil: `teuton` falso con modos de fallo (colgado, corrupto, sin
-resume, 40 MB por stdout), Playwright sobre el Electron real, proyectos
-deliberadamente corruptos y `docs/UAT.md` con la lista de ataques.
+Nada.
 
 ## Next
 
-- Fase 5 — reinstalar (`./scripts/instalar.sh --forzar`), verificar en la app
-  instalada que la CSP está activa y que un ciclo de modo examen entero funciona.
-- Revisar si el `files` de electron-builder (`node_modules/**/*`) mete
-  dependencias de desarrollo en el AppImage.
+Usarla en un examen real. Quedan seis comprobaciones que necesitan una persona,
+listadas al final de `docs/UAT.md`: USB desconectado a mitad, disco lleno,
+suspender con el modo examen activo, cerrar ventana y cerrar sesión con una
+corrección en marcha, y mirar el proyector a tres metros con 30 alumnos.
 
-Sigue pendiente de mirar en clase: si 16rem de ancho mínimo en la columna de
+Sigue pendiente de decidir en clase: si 16rem de ancho mínimo en la columna de
 preguntas es el bueno, y si con 30 alumnos el nombre de pila basta.
 
 ## References
 
 - `CLAUDE.md` — reglas de trabajo y mecanismos no evidentes.
+- `docs/UAT.md` — ataques automatizados y comprobaciones manuales.
 - `docs/DESIGN.md` — reglas visuales.
 - `docs/PRODUCT.md` — para quién es y qué cuenta como éxito.
 - `README.md` — instalación, primer arranque y proyecto de demostración.
@@ -89,4 +64,6 @@ preguntas es el bueno, y si con 30 alumnos el nombre de pila basta.
 
 - Tras tocar código hay que reinstalar (`./scripts/instalar.sh`) o se prueba la
   versión anterior.
+- `npm run test:e2e` necesita un `DISPLAY` real y, para el escenario 15, haber
+  empaquetado antes.
 - En este repo los comentarios van en español.
