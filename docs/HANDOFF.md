@@ -46,18 +46,33 @@ parar al final de cualquiera.
   - Notas negativas o no finitas ya no tiran la vista de Analíticas.
 - `npm run typecheck` y `npm test` (106 tests) en verde.
 
+- **Fase 3 — seguridad** (defensa en profundidad: no hay `innerHTML` ni `eval`
+  en el renderer, que solo carga contenido propio):
+  - Las rutas están confinadas a los proyectos que el profesor ha abierto de
+    verdad (selector del sistema o lista de recientes). Antes, los 14 handlers
+    con directorio aceptaban cualquier ruta del disco: `saveProject` era una
+    escritura arbitraria y `openPath` un `xdg-open` de lo que fuera.
+  - CSP de verdad en la app instalada: se incrusta como `<meta>` al compilar
+    (`inlineCsp`). La cabecera HTTP del proceso main no llegaba nunca al AppImage
+    porque el renderer se carga con `file://`, donde `webRequest` no interviene.
+    Añadidas `base-uri`, `form-action` y `object-src`, que no heredan.
+  - `isTrustedSender` compara la ruta real del renderer, no el final de la URL.
+  - `fileName` rechaza `..` y ficheros ocultos; la ruta manual de Teutón en
+    Ajustes se comprueba (`teuton version`) antes de quedar fijada.
+- `npm run typecheck` y `npm test` (107 tests) en verde.
+
 ## In progress
 
-Fase 3 — seguridad: confinar las rutas IPC a los proyectos abiertos de verdad,
-CSP real en el AppImage (hoy se entrega como cabecera y el renderer se carga con
-`file://`, donde no se aplica), `isTrustedSender` por ruta exacta, `openPath`
-limitado al proyecto y comprobación de que el binario elegido parece Teutón.
+Fase 4 — UAT hostil: `teuton` falso con modos de fallo (colgado, corrupto, sin
+resume, 40 MB por stdout), Playwright sobre el Electron real, proyectos
+deliberadamente corruptos y `docs/UAT.md` con la lista de ataques.
 
 ## Next
 
-- Fase 4 — UAT hostil: `teuton` falso con modos de fallo, Playwright sobre el
-  Electron real, proyectos deliberadamente corruptos y `docs/UAT.md`.
-- Fase 5 — reinstalar, verificar en la app instalada y cerrar.
+- Fase 5 — reinstalar (`./scripts/instalar.sh --forzar`), verificar en la app
+  instalada que la CSP está activa y que un ciclo de modo examen entero funciona.
+- Revisar si el `files` de electron-builder (`node_modules/**/*`) mete
+  dependencias de desarrollo en el AppImage.
 
 Sigue pendiente de mirar en clase: si 16rem de ancho mínimo en la columna de
 preguntas es el bueno, y si con 30 alumnos el nombre de pila basta.

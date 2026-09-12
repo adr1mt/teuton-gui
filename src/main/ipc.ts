@@ -1,11 +1,12 @@
 import { ipcMain, dialog, shell, BrowserWindow, app } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { promises as fs } from 'node:fs'
-import { join, basename } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { join, basename, resolve, sep } from 'node:path'
 import type { ChildProcess } from 'node:child_process'
 import { IPC } from '../shared/ipc'
 import type { ExportFormat, RunEvent, RunOptions } from '../shared/types'
-import { detectTeuton, resetTeutonCache, runTeutonSync, spawnRun } from './teuton'
+import { detectTeuton, looksLikeTeuton, resetTeutonCache, runTeutonSync, spawnRun } from './teuton'
 import {
   createProject,
   getRecents,
@@ -65,14 +66,49 @@ function reserveDir(dir: string): void {
 }
 const EXPORT_FORMATS = new Set<ExportFormat>(['txt', 'html', 'yaml', 'json', 'xml', 'markdown', 'colored_text'])
 
+/**
+ * Directorios de proyecto que el profesor ha elegido de verdad: lo que devuelve
+ * el selector del sistema y lo que ya está en la lista de recientes.
+ *
+ * `validatedPath` normaliza la ruta pero no la confina (`resolve` colapsa los
+ * `..`, no los prohíbe), así que sin esto cualquier handler aceptaba cualquier
+ * ruta absoluta del disco: `saveProject` era una escritura arbitraria de 10 MB
+ * con nombre elegido por quien llamara, y `openPath` un `xdg-open` de lo que
+ * fuera. Hoy no hay forma de explotarlo (no hay `innerHTML` ni `eval` en el
+ * renderer, que solo carga contenido propio), pero el coste de cerrarlo es este
+ * conjunto y la app maneja datos reales de alumnos.
+ */
+const allowedRoots = new Set<string>()
+
+function allowRoot(dir: string): string {
+  const root = resolve(dir)
+  allowedRoots.add(root)
+  return root
+}
+
+function isInsideAllowedRoot(path: string): boolean {
+  for (const root of allowedRoots) {
+    if (path === root || path.startsWith(root + sep)) return true
+  }
+  return false
+}
+
 function projectDir(value: unknown): string {
-  return validatedPath(value, 'La ruta del proyecto')
+  const path = validatedPath(value, 'La ruta del proyecto')
+  if (!isInsideAllowedRoot(path)) {
+    throw new Error('Esa carpeta no es un proyecto abierto en la aplicación.')
+  }
+  return path
 }
 
 function fileName(value: unknown, label: string): string {
   if (typeof value !== 'string' || !value || value.length > 128 || basename(value) !== value || value.includes('\0')) {
     throw new Error(`${label} no es válido.`)
   }
+  // `basename('..') === '..'`, así que hasta aquí llegaban: como nombre de test
+  // hacía que `loadResults` leyera un nivel por encima del directorio de salida,
+  // y como nombre de fichero permitía escribir ficheros ocultos del proyecto.
+  if (value.startsWith('.')) throw new Error(`${label} no es válido.`)
   return value
 }
 
@@ -103,7 +139,9 @@ function runIdentifier(value: unknown): string {
 
 function isTrustedSender(event: IpcMainInvokeEvent): boolean {
   const senderUrl = event.senderFrame?.url || event.sender.getURL()
-  if (app.isPackaged) return senderUrl.startsWith('file:') && senderUrl.endsWith('/renderer/index.html')
+  // Comparación con la ruta real del renderer, no con el final de la URL:
+  // cualquier documento file:// acabado en /renderer/index.html pasaba el filtro.
+  if (app.isPackaged) return senderUrl === pathToFileURL(join(__dirname, '../renderer/index.html')).href
   const devUrl = process.env['ELECTRON_RENDERER_URL']
   if (!devUrl) return senderUrl.startsWith('file:')
   try {
@@ -263,7 +301,10 @@ export function registerIpc(): void {
     const res = await dialog.showOpenDialog({
       properties: ['openDirectory', 'createDirectory']
     })
-    return res.canceled || res.filePaths.length === 0 ? null : res.filePaths[0]
+    if (res.canceled || res.filePaths.length === 0) return null
+    // Elegida por el profesor en el diálogo del sistema: a partir de aquí es un
+    // destino legítimo para el resto de operaciones.
+    return allowRoot(res.filePaths[0])
   })
 
   handle(IPC.createProject, (_e, dir) => createProject(projectDir(dir)))
@@ -391,9 +432,22 @@ export function registerIpc(): void {
     return res.filePath
   })
 
-  handle(IPC.recentProjects, () => getRecents())
+  handle(IPC.recentProjects, async () => {
+    const recents = await getRecents()
+    // Abrir un reciente es legítimo: el profesor ya trabajó ahí. Esta llamada es
+    // lo primero que hace la pantalla de Inicio, así que la lista queda
+    // autorizada antes de que pueda pulsar nada.
+    for (const entry of recents) allowRoot(entry.dir)
+    return recents
+  })
   handle(IPC.removeRecent, (_e, dir) => removeRecent(projectDir(dir)))
-  handle(IPC.openPath, (_e, target) => shell.openPath(validatedPath(target, 'La ruta')))
+  handle(IPC.openPath, (_e, target) => {
+    // `shell.openPath` en Linux es `xdg-open`, que EJECUTA un `.desktop`. Su
+    // único uso real es abrir la carpeta de informes del proyecto.
+    const path = validatedPath(target, 'La ruta')
+    if (!isInsideAllowedRoot(path)) throw new Error('Solo se pueden abrir carpetas del proyecto.')
+    return shell.openPath(path)
+  })
   handle(IPC.openExternal, (_e, url) => {
     // Lista blanca de esquemas: nunca abrir file: u otros esquemas peligrosos.
     if (typeof url === 'string' && /^(https?|mailto):/i.test(url)) {
@@ -409,6 +463,12 @@ export function registerIpc(): void {
   handle(IPC.setTeutonPath, async (_e, path) => {
     if (path !== null && path !== '' && typeof path !== 'string') throw new Error('La ruta de teuton no es válida.')
     const safePath = path === null || path === '' ? null : validatedPath(path, 'La ruta de teuton')
+    if (safePath && !(await looksLikeTeuton(safePath))) {
+      throw new Error(
+        'Ese programa no responde como Teutón (`teuton version` no devuelve una versión). ' +
+          'Revisa la ruta antes de guardarla.'
+      )
+    }
     await setTeutonPath(safePath)
     resetTeutonCache()
     return detectTeuton()

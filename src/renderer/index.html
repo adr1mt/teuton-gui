@@ -2,9 +2,12 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <!-- La CSP se aplica como cabecera HTTP desde el proceso main (ver src/main/index.ts),
-         no como <meta>, porque en desarrollo hace falta relajarla (script-src 'unsafe-inline')
-         para el preámbulo inline de @vitejs/plugin-react, y eso solo puede decidirse en main. -->
+    <!-- En DESARROLLO la CSP llega como cabecera HTTP desde el proceso main (ver
+         src/main/index.ts), porque hay que relajarla (script-src 'unsafe-inline')
+         para el preámbulo inline de @vitejs/plugin-react. En la app EMPAQUETADA el
+         renderer se carga con file://, donde webRequest no interviene y la cabecera
+         no llega: ahí la CSP estricta se incrusta como <meta> al compilar
+         (inlineCsp en electron.vite.config.ts). No la escribas a mano aquí. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Teutón GUI</title>
   </head>

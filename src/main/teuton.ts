@@ -185,6 +185,24 @@ export function resetTeutonCache(): void {
   lastDiagnostics = { source: null }
 }
 
+/**
+ * ¿La ruta que el profesor ha escrito en Ajustes se comporta como Teutón?
+ *
+ * La ruta manual tiene prioridad absoluta y se usa luego para TODO (`check`,
+ * `run`, `export`) con el directorio del proyecto como cwd, así que conviene
+ * comprobarla antes de dejarla fijada en lugar de descubrir en medio de un
+ * examen que apunta a otro programa.
+ */
+export async function looksLikeTeuton(path: string): Promise<boolean> {
+  try {
+    const env = await teutonEnv()
+    const { stdout } = await execFileAsync(path, ['version'], { env, timeout: 8000 })
+    return /version\s+[\d.]+/i.test(stdout)
+  } catch {
+    return false
+  }
+}
+
 export async function detectTeuton(): Promise<TeutonStatus> {
   resetTeutonCache()
   const path = await resolveTeuton()

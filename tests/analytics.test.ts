@@ -6,6 +6,7 @@ import {
   gradeDistribution,
   groupSuccess,
   studentRows,
+  type StudentRow,
   studentsNeedingAttention
 } from '../src/renderer/src/lib/analytics'
 import { caseReport, loadedResults, resumeCase } from './helpers'

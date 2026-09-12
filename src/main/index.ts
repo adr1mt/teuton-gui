@@ -8,12 +8,15 @@ app.disableHardwareAcceleration()
 app.commandLine.appendSwitch('disable-gpu-compositing')
 
 /**
- * La CSP se aplica como cabecera HTTP (no como <meta> en el HTML) para poder
- * distinguir desarrollo de producción. En desarrollo, @vitejs/plugin-react
- * inyecta su preámbulo de React Refresh como <script type="module"> inline en
- * el HTML servido por Vite; sin 'unsafe-inline' en script-src la CSP lo
- * bloquea y el renderer se queda en blanco. En producción (app empaquetada)
- * se mantiene la política estricta original, sin relajar nada.
+ * CSP de DESARROLLO, como cabecera HTTP. @vitejs/plugin-react inyecta su
+ * preámbulo de React Refresh como <script> inline en el HTML servido por Vite;
+ * sin 'unsafe-inline' en script-src la CSP lo bloquea y el renderer se queda en
+ * blanco, y eso solo se puede decidir aquí.
+ *
+ * En la app EMPAQUETADA esta cabecera no sirve de nada: el renderer se carga con
+ * `loadFile` (`file://`) y `webRequest` no interviene en ese esquema. Allí la
+ * política estricta viaja incrustada como <meta> desde el build (`inlineCsp` en
+ * electron.vite.config.ts). Las dos listas deben mantenerse a la par.
  */
 function registerCsp(): void {
   const scriptSrc = app.isPackaged ? "script-src 'self' blob:" : "script-src 'self' blob: 'unsafe-inline'"
@@ -25,7 +28,11 @@ function registerCsp(): void {
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self' data:",
     "img-src 'self' data: blob:",
-    connectSrc
+    connectSrc,
+    // No heredan de default-src, hay que declararlas.
+    "base-uri 'none'",
+    "form-action 'none'",
+    "object-src 'none'"
   ].join('; ')
 
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {

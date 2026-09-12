@@ -49,6 +49,16 @@ vi.mock('electron', () => ({
   safeStorage: { isEncryptionAvailable: () => false }
 }))
 
+// El directorio de pruebas tiene que estar en la lista de proyectos legítimos:
+// `projectDir()` ya no acepta cualquier ruta absoluta del disco.
+vi.mock('../src/main/projects', () => ({
+  createProject: vi.fn(),
+  getRecents: vi.fn(async () => [{ dir: '/tmp/proyecto-uat', name: 'proyecto-uat', openedAt: 0 }]),
+  openProject: vi.fn(),
+  removeRecent: vi.fn(),
+  saveProject: vi.fn()
+}))
+
 vi.mock('../src/main/teuton', () => ({
   detectTeuton: vi.fn(),
   resetTeutonCache: vi.fn(),
@@ -81,7 +91,9 @@ const idA = '11111111-1111-4111-8111-111111111111'
 const idB = '22222222-2222-4222-8222-222222222222'
 
 describe('ciclo de vida de las evaluaciones en main', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    // Autoriza el directorio igual que la pantalla de Inicio al arrancar.
+    await call(IPC.recentProjects)
     stopActiveRuns()
     runtime.spawned.length = 0
     runtime.spawnError = null
@@ -111,7 +123,7 @@ describe('ciclo de vida de las evaluaciones en main', () => {
     await call(IPC.runStart, DIR, {}, idA)
     // Con el mismo id, `activeRuns.set` sobreescribía la entrada y el primer
     // proceso quedaba fuera del registro: incancelable e inmortal.
-    await expect(call(IPC.runStart, '/tmp/otro-proyecto', {}, idA)).rejects.toThrow(/identificador/)
+    await expect(call(IPC.runStart, DIR, {}, idA)).rejects.toThrow(/identificador|activa/)
   })
 
   it('libera el proyecto si el proceso no llega a arrancar', async () => {
@@ -138,6 +150,11 @@ describe('ciclo de vida de las evaluaciones en main', () => {
     child.finish(null)
     await pending
     await expect(call(IPC.runStart, DIR, {}, idB)).resolves.toEqual({ runId: idB })
+  })
+
+  it('rechaza un directorio que no es un proyecto abierto', async () => {
+    await expect(call(IPC.runStart, '/etc', {}, idA)).rejects.toThrow(/proyecto abierto/)
+    await expect(call(IPC.loadResults, '/home/otro/cosas')).rejects.toThrow(/proyecto abierto/)
   })
 
   it('al salir de la aplicación mata todo lo que quede vivo', async () => {
