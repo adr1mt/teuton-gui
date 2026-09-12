@@ -6,8 +6,8 @@ clase aparecen una vez y no se pueden reproducir a voluntad: una máquina que no
 responde, dos ciclos que se pisan, un informe a medio escribir.
 
 ```bash
-npm run test:e2e          # los 19 escenarios sobre la app real
-npm test                  # 112 tests unitarios
+npm run test:e2e          # los 24 escenarios sobre la app real
+npm test                  # 138 tests unitarios
 npm run verify:parsing -- <proyecto ya ejecutado>
 ```
 
@@ -17,7 +17,8 @@ npm run verify:parsing -- <proyecto ya ejecutado>
   `run --export=json`, escribe informes con el formato real y tiene modos de
   fallo (`FAKE_TEUTON_MODE`): `hang` (no termina nunca), `crash` (muere a
   mitad), `truncate` (informe válido + cola de otro proceso), `noresume`,
-  `huge` (40 MB por stdout), `slow`, `notargets`, `badgrades`.
+  `huge` (40 MB por stdout), `slow`, `notargets`, `badgrades`, `offline`
+  (el primer alumno con la máquina apagada).
 - **`tests/e2e/harness.ts`** arranca la app de verdad con Playwright, cada
   escenario con su propio `userData` temporal y su proyecto temporal. **La UAT
   nunca toca las clases, los ajustes ni los proyectos reales del profesor.**
@@ -49,6 +50,10 @@ npm run verify:parsing -- <proyecto ya ejecutado>
 | 18 | Cerrar la sesión del escritorio (SIGTERM) a mitad | Cero procesos vivos después |
 | 19 | Modo examen activo | Bloquea la suspensión del equipo, y la suelta al detenerlo |
 | 20 | «Reiniciar historial» por error tras corregir | La copia de seguridad existe fuera del proyecto y «Restaurar notas» devuelve las notas |
+| 21 | «¿Todo listo?» con el examen en orden | Dice que se puede empezar, cuenta alumnos y comprobaciones; la falta de IP avisa pero no bloquea |
+| 22 | «¿Todo listo?» con el `config.yaml` roto | Bloquea y nombra el fichero, en vez de dejarlo para el primer ciclo |
+| 23 | «¿Todo listo?» con un alumno sin nombre | Bloquea: sin nombre su nota no se puede guardar ni exportar |
+| 24 | Un alumno con la máquina apagada | Su columna de la matriz sale como «máquina no responde», no como un examen todo en rojo |
 
 El 17 deja un Electron bloqueado en un diálogo nativo que hay que matar, así que
 la suite termina con un aviso de «worker teardown» aunque los 20 pasen y el

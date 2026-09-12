@@ -5,6 +5,7 @@ import {
   scanProgressChunk,
   type ProgressScanState
 } from '../lib/progress'
+import type { StallMap } from '../lib/stall'
 import type {
   DefaultGlobals,
   GradeRecords,
@@ -65,6 +66,8 @@ interface AppState {
   /** Valores que se vuelcan a global: al importar una clase (usuario/contraseña…). */
   defaultGlobals: DefaultGlobals
   records: GradeRecords
+  /** Ciclos seguidos sin avanzar, por alumno. Ver lib/stall.ts. */
+  stalls: StallMap
   run: RunState
   monitor: MonitorState
   /** Clase importada en el proyecto actual (para el CSV por clase). */
@@ -95,6 +98,7 @@ interface AppState {
   setGrading: (g: GradingSettings) => void
   setDefaultGlobals: (g: DefaultGlobals) => void
   setRecords: (r: GradeRecords) => void
+  setStalls: (s: StallMap) => void
   // Ejecución (estado global, persiste al cambiar de pestaña)
   setRun: (patch: Partial<RunState>) => void
   appendRunLine: (line: string) => void
@@ -143,6 +147,7 @@ export const useApp = create<AppState>((set, get) => ({
   grading: { passScore: 70, maxGrade: 10 },
   defaultGlobals: { host1_username: 'usuario', host1_password: 'usuario' },
   records: {},
+  stalls: {},
   run: { ...IDLE_RUN },
   monitor: { active: false, intervalMin: 5, nextRunAt: null, cycles: 0 },
   activeClass: null,
@@ -171,6 +176,7 @@ export const useApp = create<AppState>((set, get) => ({
       dirty: false,
       results: null,
       records: {},
+      stalls: {},
       run: { ...IDLE_RUN },
       monitor: { active: false, intervalMin: get().monitor.intervalMin, nextRunAt: null, cycles: 0 },
       activeClass: null,
@@ -186,6 +192,7 @@ export const useApp = create<AppState>((set, get) => ({
       dirty: false,
       results: null,
       records: {},
+      stalls: {},
       run: { ...IDLE_RUN },
       monitor: { active: false, intervalMin: get().monitor.intervalMin, nextRunAt: null, cycles: 0 },
       activeClass: null,
@@ -210,6 +217,7 @@ export const useApp = create<AppState>((set, get) => ({
   setGrading: (grading) => set({ grading }),
   setDefaultGlobals: (defaultGlobals) => set({ defaultGlobals }),
   setRecords: (records) => set({ records }),
+  setStalls: (stalls) => set({ stalls }),
   setRun: (patch) => set((s) => ({ run: { ...s.run, ...patch } })),
   appendRunLine: (line) => set((s) => {
     const maxLogChars = 500_000
@@ -236,7 +244,10 @@ export const useApp = create<AppState>((set, get) => ({
   }),
   resetRun: () => set({ run: { ...IDLE_RUN } }),
   setMonitor: (patch) => set((s) => ({ monitor: { ...s.monitor, ...patch } })),
-  setActiveClass: (activeClass, activeClassId = null) => set({ activeClass, activeClassId }),
+  // Cambiar de grupo reinicia el contador de «sin avanzar»: son otros alumnos,
+  // y un nombre repetido entre clases arrastraría los ciclos del grupo anterior.
+  setActiveClass: (activeClass, activeClassId = null) =>
+    set((s) => (s.activeClassId === activeClassId ? { activeClass } : { activeClass, activeClassId, stalls: {} })),
   setAttentionOnly: (attentionOnly) => set({ attentionOnly }),
   setOperationalError: (operationalError) => set({ operationalError })
 }))

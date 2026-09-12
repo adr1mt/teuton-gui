@@ -54,6 +54,20 @@ perder datos; lo siguiente debe salir de usar la app en clase.
   cuando se guardan sin cifrar por no haber llavero.
 - `test-results/` (salida de Playwright) ya no se versiona: ensuciaba cada
   pasada de tests con cambios falsos. Ignorada junto a `playwright-report/`.
+- **Tres mejoras del panel**, las que quedaban propuestas y ahora están hechas:
+  - **Máquina apagada ≠ examen mal hecho.** En la matriz, el alumno cuyo equipo
+    no responde ya no pinta su columna del mismo rojo que quien lo ha hecho
+    todo mal: sus celdas llevan el icono de «sin conexión» en gris y su nombre
+    también. Escenario `maquina-apagada` de la UAT (modo `offline` del teuton
+    falso).
+  - **Botón «¿Todo listo?»** en Ejecutar: comprueba de una vez Teutón, el
+    config.yaml, los alumnos y `teuton check` antes de empezar. Los fallos
+    bloquean, los avisos (p.ej. un alumno sin IP) no. Guarda los borradores
+    antes, porque `teuton check` lee el disco. Tres escenarios de UAT.
+  - **Alumno estancado**, sin cartel: quien lleva 3 vueltas sin mejorar nada y
+    sigue suspenso sube al principio de «Requieren atención» y lleva una marca
+    pequeña en su fila y en Analíticas. Quien ya aprueba y deja de subir no
+    cuenta: ha terminado.
 
 ## In progress
 
@@ -71,15 +85,22 @@ cierra las dos dudas de diseño que quedaban abiertas: 15 columnas caben en el
 panel y `shortNameMap` ya desambigua con la inicial del apellido cuando dos
 comparten nombre de pila. No hay nada que decidir ahí.
 
-Mejoras propuestas y aún no hechas, por orden de valor: distinguir «máquina
-apagada» de «suspenso» en la matriz (hay que comprobar antes si el JSON de
-Teutón lo dice); un botón «¿Todo listo?» que compruebe Teutón, YAML, clase y
-`teuton check` antes de empezar; un «modo proyector» que agrande el texto y
-oculte IPs y contraseñas; y un aviso de alumno estancado varios ciclos.
+Mejoras propuestas y aún no hechas: un «modo proyector» que agrande el texto y
+oculte IPs y contraseñas. Las otras tres ya están hechas (ver arriba).
+
+Pendiente de calibrar en clase: el umbral de «sin avanzar» son 3 vueltas
+(`STALL_CYCLES` en `lib/stall.ts`). Con un intervalo de 5 min son 15 minutos
+parado; si en el examen real salta demasiado pronto o demasiado tarde, es el
+único número que hay que tocar.
 
 Ojo al ejecutar la UAT: `npm run test:e2e` **no** compila. Hay que pasar por
 `npm run build` (o `./scripts/instalar.sh --forzar` para el escenario 15) o se
 prueba el build anterior.
+
+La UAT termina con «Worker teardown timeout of 90000ms exceeded» además del
+«24 passed». Está comprobado que es anterior a estos cambios (sale igual con el
+árbol limpio): un proceso que Playwright no cierra al acabar el worker, no un
+test que falle. Sin diagnosticar.
 
 ## References
 

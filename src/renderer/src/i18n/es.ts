@@ -96,6 +96,16 @@ export const t = {
     autoSave: 'Hay cambios sin guardar: se guardarán automáticamente al ejecutar.',
     staleResults: 'Los resultados actuales son de una ejecución anterior con otros alumnos.'
   },
+  preflight: {
+    title: '¿Todo listo?',
+    desc: 'Revisa de una vez lo que hace falta para empezar: el programa, el fichero del examen, los alumnos y el test.',
+    run: 'Comprobar',
+    checking: 'Comprobando…',
+    ready: 'Todo listo para empezar',
+    readyWithWarnings: 'Se puede empezar, pero mira los avisos',
+    blocked: 'Todavía no se puede empezar',
+    noProject: 'Abre un proyecto para poder comprobarlo.'
+  },
   monitor: {
     title: 'Modo examen',
     desc: 'Re-evalúa a todos los alumnos automáticamente cada cierto tiempo. Ideal para proyectar el progreso en clase durante el examen.',
@@ -215,6 +225,10 @@ export const t = {
     legendPartial: 'parcial (puntos logrados)',
     legendFail: 'fallado',
     legendNa: 'sin dato',
+    legendOffline: 'máquina no responde',
+    offlineHint: 'Teutón no pudo conectar con su equipo: los fallos de esta columna pueden no ser suyos.',
+    stalled: 'Sin avanzar',
+    stalledCycles: (n: number) => `Lleva ${n} ${n === 1 ? 'vuelta' : 'vueltas'} sin mejorar nada. Puede que esté atascado.`,
     reload: 'Recargar',
     reloadResults: 'Recargar resultados',
     openFolder: 'Carpeta',
@@ -252,7 +266,8 @@ export const t = {
     successRate: 'éxito',
     noErrors: 'Sin errores: todos los objetivos superados.',
     attention: 'Atención prioritaria',
-    attentionDesc: 'Hosts caídos primero, después las notas por debajo del aprobado.',
+    attentionDesc: 'Hosts caídos primero, después quien no avanza y por último las notas por debajo del aprobado.',
+    stalled: 'Atascado, no avanza',
     noAttention: 'No hay incidencias técnicas ni alumnos por debajo del aprobado.',
     technicalIssue: 'Revisar conexión',
     andMore: 'Y otros',

@@ -1,4 +1,5 @@
 import type { CaseReport, LoadedResults, ResumeCase, TeutonTarget } from '../../../shared/types'
+import { stalledCycles, type StallMap } from './stall'
 
 export interface StudentRow {
   id: string
@@ -100,13 +101,21 @@ export function computeKpis(rows: StudentRow[], passScore: number): Kpis {
 
 /**
  * Alumnos que requieren intervención del profesor. Prioriza conexiones caídas
- * (normalmente un problema técnico) y después las notas bajo el umbral elegido.
+ * (normalmente un problema técnico), después quien lleva varios ciclos sin
+ * avanzar —el que de verdad hay que ir a ver, porque una nota baja que sube
+ * sola no necesita a nadie— y por último las notas bajo el umbral elegido.
  */
-export function studentsNeedingAttention(rows: StudentRow[], passScore: number): StudentRow[] {
+export function studentsNeedingAttention(
+  rows: StudentRow[],
+  passScore: number,
+  stalls: StallMap = {}
+): StudentRow[] {
+  const stuck = (r: StudentRow): number => (stalledCycles(stalls, r, passScore) > 0 ? 1 : 0)
   return rows
     .filter((r) => r.connErrors > 0 || r.grade < passScore)
     .sort((a, b) =>
       b.connErrors - a.connErrors ||
+      stuck(b) - stuck(a) ||
       a.grade - b.grade ||
       b.failed - a.failed ||
       a.members.localeCompare(b.members, 'es')
@@ -190,6 +199,12 @@ export interface MatrixStudent {
   id: string
   members: string
   grade: number
+  /**
+   * Teutón no pudo conectar con su máquina. Sin esto, un equipo apagado pinta
+   * la columna entera de rojo y se lee igual que un alumno que lo ha hecho todo
+   * mal: uno necesita que vayas a su sitio, el otro no.
+   */
+  unreachable: boolean
   cells: MatrixCell[]
 }
 
@@ -236,7 +251,13 @@ export function buildMatrix(rows: StudentRow[]): Matrix {
         ? { score: hit.score, weight: hit.weight, check: hit.check, present: true }
         : { score: 0, weight: t.weight, check: false, present: false }
     })
-    return { id: row.id, members: row.members, grade: row.grade, cells }
+    return {
+      id: row.id,
+      members: row.members,
+      grade: row.grade,
+      unreachable: row.connErrors > 0,
+      cells
+    }
   })
 
   return { targets, students }

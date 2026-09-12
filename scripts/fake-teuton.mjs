@@ -20,6 +20,7 @@
  *   huge       escupe 40 MB por stdout (revienta el maxBuffer de execFile)
  *   notargets  `check` sin fila Targets (la barra de progreso se queda sin total)
  *   badgrades  notas negativas, no finitas y por encima de 100 en resume.json
+ *   offline    el primer alumno tiene la máquina apagada (conn_status con error)
  *
  * FAKE_TEUTON_VERSION cambia la versión que anuncia; vacía = no imprime versión
  * (para probar el rechazo de un binario que no es Teutón).
@@ -119,6 +120,9 @@ function caseReport(entry, index, grade) {
 /** Nota simulada estable por alumno, para que dos pasadas no bailen. */
 function gradeFor(entry, index) {
   if (mode === 'badgrades') return [-25, Number.POSITIVE_INFINITY, 150, 0][index % 4]
+  // Con la máquina apagada no se supera ni un objetivo: exactamente lo mismo que
+  // marca el alumno que lo ha hecho todo mal, que es el lío que hay que separar.
+  if (mode === 'offline' && index === 0) return 0
   const scale = [100, 75, 50, 100, 25, 0]
   return scale[index % scale.length]
 }
@@ -192,7 +196,9 @@ async function main() {
       letter: grade >= 100 ? '✔' : '',
       grade,
       members: entry.members,
-      conn_status: {},
+      // Máquina apagada: Teutón llena conn_status y el alumno falla TODOS los
+      // objetivos sin haberlo intentado.
+      conn_status: mode === 'offline' && index === 0 ? { host1: 'Connection refused' } : {},
       moodle_id: entry.moodleId || 'NODATA',
       moodle_feedback: `"Filename: case-${id}."`
     })

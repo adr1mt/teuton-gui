@@ -9,6 +9,7 @@ import {
   type StudentRow,
   studentsNeedingAttention
 } from '../src/renderer/src/lib/analytics'
+import { updateStalls, type StallMap } from '../src/renderer/src/lib/stall'
 import { caseReport, loadedResults, resumeCase } from './helpers'
 
 describe('studentRows', () => {
@@ -102,6 +103,23 @@ describe('buildMatrix', () => {
     const res = loadedResults({ resumeCases: [resumeCase('01', 'pepito', 0)] })
     expect(buildMatrix(studentRows(res)).targets).toEqual([])
   })
+
+  // Una máquina apagada falla todos los objetivos y se leía igual que el alumno
+  // que peor lo ha hecho; la matriz necesita poder pintarla distinto.
+  it('marca la columna del alumno cuya máquina no responde', () => {
+    const res = loadedResults({
+      resumeCases: [
+        resumeCase('01', 'pepito', 0, { connErrors: { host1: 'timeout' } }),
+        resumeCase('02', 'ana', 0)
+      ],
+      cases: [
+        caseReport('01', 'pepito', 0, [{ id: 't1', check: false }]),
+        caseReport('02', 'ana', 0, [{ id: 't1', check: false }])
+      ]
+    })
+    const students = buildMatrix(studentRows(res)).students
+    expect(students.map((s) => s.unreachable)).toEqual([true, false])
+  })
 })
 
 describe('computeKpis', () => {
@@ -147,6 +165,41 @@ describe('studentsNeedingAttention', () => {
       'luis'
     ])
     expect(studentsNeedingAttention(rows, 50).map((r) => r.members)).toEqual(['marta', 'pepito'])
+  })
+
+  // Entre dos suspensos, el que lleva ciclos sin moverse va primero: es al que
+  // hay que ir a ver. El host caído sigue ganando a los dos.
+  it('quien no avanza adelanta a un suspenso peor pero que sube', () => {
+    const rows = studentRows(
+      loadedResults({
+        resumeCases: [
+          resumeCase('01', 'ana', 20),
+          resumeCase('02', 'luis', 50),
+          resumeCase('03', 'marta', 10, { connErrors: { host1: 'timeout' } })
+        ]
+      })
+    )
+    // ana mejora en cada vuelta; luis lleva cuatro sin tocar nada.
+    let stalls: StallMap = {}
+    for (const anaGrade of [5, 10, 15, 20]) {
+      stalls = updateStalls(stalls, [
+        { ...rows[0], grade: anaGrade },
+        rows[1],
+        rows[2]
+      ])
+    }
+
+    expect(studentsNeedingAttention(rows, 70, stalls).map((r) => r.members)).toEqual([
+      'marta',
+      'luis',
+      'ana'
+    ])
+    // Sin el historial, manda la nota: ana la tiene peor.
+    expect(studentsNeedingAttention(rows, 70).map((r) => r.members)).toEqual([
+      'marta',
+      'ana',
+      'luis'
+    ])
   })
 })
 

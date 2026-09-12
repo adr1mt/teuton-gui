@@ -17,6 +17,7 @@ import {
   GraduationCap,
   Play,
   TrendingDown,
+  Hourglass,
   WifiOff
 } from 'lucide-react'
 import { useApp } from '../stores/app'
@@ -29,6 +30,7 @@ import {
   gradeDistribution,
   studentsNeedingAttention
 } from '../lib/analytics'
+import { stalledCycles } from '../lib/stall'
 import { useChartColors } from '../lib/useChartColors'
 import { Button, MetaChip, SectionTitle, ViewHeader } from '../components/ui'
 import { formatGrade } from '../lib/grading'
@@ -43,7 +45,7 @@ import { formatGrade } from '../lib/grading'
 const ATTENTION_PREVIEW = 8
 
 export default function Analytics() {
-  const { results, grading, activeClass, project, setView, setAttentionOnly } = useApp()
+  const { results, grading, activeClass, project, stalls, setView, setAttentionOnly } = useApp()
   const colors = useChartColors()
 
   const data = useMemo(() => {
@@ -52,12 +54,12 @@ export default function Analytics() {
     return {
       rows,
       kpis: computeKpis(rows, grading.passScore),
-      attention: studentsNeedingAttention(rows, grading.passScore),
+      attention: studentsNeedingAttention(rows, grading.passScore, stalls),
       errors: frequentErrors(results).slice(0, 10),
       groups: groupSuccess(results),
       dist: gradeDistribution(rows)
     }
-  }, [results, grading.passScore])
+  }, [results, grading.passScore, stalls])
 
   if (!results || !data) {
     return (
@@ -189,6 +191,14 @@ export default function Analytics() {
                             <span className="flex items-center gap-1.5 font-medium text-destructive-strong">
                               <WifiOff className="h-3.5 w-3.5 shrink-0" />
                               {t.analytics.technicalIssue} ({row.connErrors})
+                            </span>
+                          ) : stalledCycles(stalls, row, grading.passScore) > 0 ? (
+                            /* Nota baja que no se mueve entre vueltas: es otro
+                               problema que una nota baja que va subiendo. */
+                            <span className="flex items-center gap-1.5 font-medium text-warning-strong">
+                              <Hourglass className="h-3.5 w-3.5 shrink-0" />
+                              {t.analytics.stalled} (
+                              {stalledCycles(stalls, row, grading.passScore)})
                             </span>
                           ) : (
                             <span className="flex items-center gap-1.5 text-warning-strong">

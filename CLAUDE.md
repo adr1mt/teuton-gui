@@ -75,7 +75,7 @@ npm run verify:parsing -- <path/to/a/project/already/run>
 
 **Hostile UAT** (`tests/e2e/`, `npm run test:e2e`). Playwright drives the real app; `scripts/fake-teuton.mjs`
 stands in for the CLI with failure modes real machines can't be asked to reproduce (`FAKE_TEUTON_MODE`:
-`hang`, `crash`, `truncate`, `noresume`, `huge`, `slow`, `notargets`, `badgrades`). Every scenario gets its
+`hang`, `crash`, `truncate`, `noresume`, `huge`, `slow`, `notargets`, `badgrades`, `offline`). Every scenario gets its
 own temporary `userData` and project, so **the UAT never touches the teacher's real classes or settings**.
 Orphan processes are detected through the pidfiles the fake binary writes, not `pgrep -f`, whose pattern
 also matches the command line of whoever is searching. See `docs/UAT.md` for the list of attacks and the
@@ -125,10 +125,12 @@ Each of these has a bug behind it. Read the one that covers what you are about t
 | the Run tab, «modo examen», cancelling a run | Background execution & the monitor loop |
 | the progress bar or stdout parsing | Live progress bar |
 | grades, passing thresholds, KPIs | Grading conversion |
+| the attention list, the stalled-student badge | Stalled students |
+| the «¿Todo listo?» button in Run | Pre-flight checks |
 | Settings, shared credentials, class import | App-level default globals |
 | Moodle export, grade history, «Reiniciar historial», «Restaurar notas» | Best-grade record / Hourly grade backups / Per-class Moodle CSVs |
 | the editor, drafts, launching a run | Draft-vs-disk consistency |
-| the dashboard matrix, analytics, report loading | Corrupt `case-NN.json` |
+| the dashboard matrix, analytics, report loading | Corrupt `case-NN.json` · Machine off vs. exam failed |
 | invoking the `teuton` binary | PATH discovery |
 | any IPC handler that takes a path | Confined project paths |
 | the CSP, `index.html`, the vite config | CSP lives in two places |
@@ -181,6 +183,37 @@ character per check to stdout between the `Started at` and `Finished in` lines: 
 1, not `targetsPerCase`). `computeLiveProgress` scopes its regex match strictly to the region between those
 two markers — matching `.`/`F`/`S` anywhere in the full buffer would false-positive on grade values like
 "100.0" or on the word "Finished" itself.
+
+**Stalled students** (`lib/stall.ts`). During the exam the teacher sees low grades every few minutes
+but cannot remember which ones are the *same* low grades as half an hour ago — a student who is stuck
+(doesn't understand the wording, machine half-booted) looks identical to one who is merely slow, and only
+the first one needs someone to walk over. `updateStalls` keeps each student's last passed-target count and
+grade; a cycle where neither rises increments their counter, and `stalledCycles` reports it from
+`STALL_CYCLES` (3) on, but **only while they are still below the pass threshold** — someone who has passed
+and stopped improving has finished, not stalled. Students absent from the current pass (a single-student
+re-evaluation) keep their counter untouched: they haven't been looked at again. The map lives in the store
+and is reset by `setProject`/`closeProject` and by `setActiveClass` when the *class id* changes, because a
+name shared between two groups would otherwise inherit the other group's cycles. It is deliberately not a
+banner: the count rides in the roster row next to the connection badge, and its only other effect is
+sorting the student to the top of `studentsNeedingAttention` (after downed hosts, ahead of a worse grade
+that is still climbing).
+
+**Pre-flight checks** (`lib/preflight.ts`). Every failure «¿Todo listo?» reports was already discoverable —
+Settings says whether Teutón is installed, the config table locks on broken YAML, `teuton check` runs
+behind the progress bar — but one at a time and in the middle of a run, with the class already in the room.
+It answers them together beforehand. Two things matter: it calls `saveDraftsIfDirty()` first for the same
+reason `startRun` does (`teuton check` reads the *disk*, so an unsaved class import would be checked
+against the previous exam), and it skips `teuton check` when the binary is missing or the YAML is broken,
+whose error would otherwise be counted twice. `fail` blocks, `warn` doesn't: a missing `host1_ip` may be
+intentional, and refusing to launch an exam that would work is how a check gets ignored. `evaluateTeuton`,
+`evaluateConfig` and `evaluateCheck` are pure and unit-tested; only `runPreflight` touches IPC.
+
+**Machine off vs. exam failed** (`MatrixStudent.unreachable`, `lib/analytics.ts`). Teutón reports
+unreachable hosts in `resume.json`'s `conn_status`, which the list view already used for the `WifiOff`
+badge — but the matrix painted that student's whole column the same red as a student who genuinely got
+everything wrong. `buildMatrix` now carries `unreachable` per student and `MatrixCellView` renders their
+failing cells as a neutral offline glyph, keeping the red ✕ for real failures. Passing cells stay green
+(some targets don't need the connection) and a missing case report still wins with `?`.
 
 **Grading conversion** (`lib/grading.ts`). Teutón's native score is always 0–100. The GUI overlays a
 configurable piecewise-linear mapping — `(0,0)`, `(passScore, maxGrade/2)`, `(100, maxGrade)` — so a

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import {
   Download,
   Search,
@@ -21,7 +21,8 @@ import {
   CheckCircle2,
   AlertTriangle,
   GraduationCap,
-  Filter
+  Filter,
+  Hourglass
 } from 'lucide-react'
 import { useApp } from '../stores/app'
 import { t } from '../i18n/es'
@@ -50,6 +51,7 @@ import {
 import { bestScore, formatGrade, isPass, passColor } from '../lib/grading'
 import { parseConfig } from '../lib/config'
 import { shortNameMap } from '../lib/names'
+import { stalledCycles, type StallMap } from '../lib/stall'
 import { buildMoodleCsv } from '../lib/moodleCsv'
 import { reloadLatestResults, caseIndexFor, reevaluateStudent } from '../lib/run'
 import { sanitizeFileName } from '../../../shared/sanitize'
@@ -85,6 +87,7 @@ export default function Dashboard() {
     loadingResults,
     grading,
     records,
+    stalls,
     activeClass,
     activeClassId,
     setRecords,
@@ -108,8 +111,8 @@ export default function Dashboard() {
   const rows = useMemo(() => (results ? studentRows(results) : []), [results])
   const kpis = useMemo(() => computeKpis(rows, grading.passScore), [rows, grading.passScore])
   const attention = useMemo(
-    () => studentsNeedingAttention(rows, grading.passScore),
-    [rows, grading.passScore]
+    () => studentsNeedingAttention(rows, grading.passScore, stalls),
+    [rows, grading.passScore, stalls]
   )
   const identityIssues = useMemo(
     () => (results ? validateResultIdentity(results) : []),
@@ -505,6 +508,7 @@ export default function Dashboard() {
             rows={visible}
             sort={sort}
             records={records}
+            stalls={stalls}
             grading={grading}
             onSelect={selectStudent}
             emptyLabel={attentionOnly ? t.dashboard.noFailing : '—'}
@@ -762,6 +766,7 @@ function Roster({
   rows,
   sort,
   records,
+  stalls,
   grading,
   onSelect,
   emptyLabel
@@ -769,6 +774,7 @@ function Roster({
   rows: StudentRow[]
   sort: SortSpec
   records: Record<string, number>
+  stalls: StallMap
   grading: Grading
   onSelect: (r: StudentRow) => void
   emptyLabel: string
@@ -807,6 +813,7 @@ function Roster({
           key={r.id}
           row={r}
           record={records[r.members]}
+          stalled={stalledCycles(stalls, r, grading.passScore)}
           grading={grading}
           canReevaluate={caseIdxById.get(r.id) != null}
           running={running}
@@ -820,6 +827,7 @@ function Roster({
 function RosterRow({
   row,
   record,
+  stalled,
   grading,
   canReevaluate,
   running,
@@ -827,6 +835,8 @@ function RosterRow({
 }: {
   row: StudentRow
   record?: number
+  /** Ciclos seguidos sin avanzar; 0 = no hay nada que avisar. */
+  stalled: number
   grading: Grading
   canReevaluate: boolean
   running: boolean
@@ -861,6 +871,19 @@ function RosterRow({
               <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-destructive-strong">
                 <WifiOff className="h-3.5 w-3.5" />
                 {row.connErrors}
+              </span>
+            )}
+            {/* Aviso pequeño y dentro de la fila, no un cartel: el profesor ya
+                mira esta lista, y quien no avanza sube solo al principio del
+                filtro «Requieren atención». Un banner por alumno taparía el
+                panel justo cuando más gente hay en pantalla. */}
+            {stalled > 0 && row.connErrors === 0 && (
+              <span
+                className="flex shrink-0 items-center gap-1 text-xs font-medium text-warning-strong"
+                title={t.dashboard.stalledCycles(stalled)}
+              >
+                <Hourglass className="h-3.5 w-3.5" />
+                {t.dashboard.stalled} ({stalled})
               </span>
             )}
           </div>
@@ -977,6 +1000,11 @@ function MatrixView({
         <Legend cls="bg-warning text-warning-foreground" glyph="5" label={t.dashboard.legendPartial} />
         <Legend cls="bg-destructive-strong text-card" glyph="✕" label={t.dashboard.legendFail} />
         <Legend cls="bg-muted-foreground/25 text-foreground" glyph="?" label={t.dashboard.legendNa} />
+        <Legend
+          cls="bg-muted-foreground/70 text-card"
+          glyph={<WifiOff className="h-2.5 w-2.5" />}
+          label={t.dashboard.legendOffline}
+        />
       </div>
       <Card className="overflow-hidden">
         <div className="max-h-[calc(100vh-15rem)] overflow-auto">
@@ -1012,9 +1040,14 @@ function MatrixView({
                         inicial para no confundirlos en el proyector. */}
                     <button
                       onClick={() => selectStudent(s.id)}
-                      className="mx-auto block max-w-[7rem] truncate rounded transition-colors hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="mx-auto flex max-w-[7rem] items-center gap-1 rounded transition-colors hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
-                      {shortNames.get(s.id) ?? s.members}
+                      {/* La columna entera puede estar en rojo por una máquina
+                          apagada, no por el alumno: se dice en su cabecera. */}
+                      {s.unreachable && (
+                        <WifiOff className="h-3.5 w-3.5 shrink-0 text-destructive-strong" />
+                      )}
+                      <span className="truncate">{shortNames.get(s.id) ?? s.members}</span>
                     </button>
                   </th>
                 ))}
@@ -1036,7 +1069,7 @@ function MatrixView({
                   </th>
                   {students.map((s) => (
                     <td key={s.id} className="border-b border-border px-1 py-1 text-center">
-                      <MatrixCellView cell={s.cells[ti]} />
+                      <MatrixCellView cell={s.cells[ti]} unreachable={s.unreachable} />
                     </td>
                   ))}
                 </tr>
@@ -1089,9 +1122,11 @@ function MatrixView({
 }
 
 function MatrixCellView({
-  cell
+  cell,
+  unreachable
 }: {
   cell: { score: number; weight: number; check: boolean; present: boolean }
+  unreachable: boolean
 }) {
   // Cada estado lleva glifo propio además del color: a distancia de proyector y
   // para quien no distingue rojo de verde, el color solo no basta.
@@ -1120,6 +1155,20 @@ function MatrixCellView({
       </span>
     )
   }
+  // Máquina apagada o inalcanzable: el objetivo no se ha podido ni intentar.
+  // Pintarlo del mismo rojo que un fallo real hacía que el alumno con el equipo
+  // apagado se leyera como el que peor lo ha hecho de la clase.
+  if (unreachable) {
+    return (
+      <span
+        title={t.dashboard.offlineHint}
+        className="inline-flex h-6 w-6 items-center justify-center rounded bg-muted-foreground/70 text-card"
+      >
+        <WifiOff className="h-3.5 w-3.5" aria-hidden />
+        <span className="sr-only">{t.dashboard.legendOffline}</span>
+      </span>
+    )
+  }
   return (
     <span // «strong» + texto del color de la tarjeta: el par se invierte con el tema
       // (rojo oscuro sobre blanco en claro, rojo claro sobre oscuro en oscuro) y
@@ -1130,7 +1179,15 @@ function MatrixCellView({
   )
 }
 
-function Legend({ cls, glyph, label }: { cls: string; glyph: string; label: string }) {
+function Legend({
+  cls,
+  glyph,
+  label
+}: {
+  cls: string
+  glyph: ReactNode
+  label: string
+}) {
   return (
     <span className="flex items-center gap-1.5">
       <span

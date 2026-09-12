@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { Play, Square, RotateCw, Terminal, Loader2, CheckCircle2, XCircle, ListChecks, Info, GraduationCap, Copy, Check } from 'lucide-react'
+import { Play, Square, RotateCw, Terminal, Loader2, CheckCircle2, XCircle, ListChecks, Info, GraduationCap, Copy, Check, ClipboardCheck, AlertTriangle } from 'lucide-react'
 import { useApp } from '../stores/app'
 import { t } from '../i18n/es'
-import { Button, MetaChip, ProgressBar, SectionTitle, ViewHeader } from '../components/ui'
+import { Button, Card, MetaChip, ProgressBar, SectionTitle, ViewHeader } from '../components/ui'
 import { parseConfig } from '../lib/config'
 import { cn } from '../lib/utils'
 import { startRun, cancelRun, reloadLatestResults } from '../lib/run'
 import { useRunProgress } from '../lib/progress'
 import { MonitorControl } from '../components/Monitor'
+import { runPreflight, type PreflightItem, type PreflightReport } from '../lib/preflight'
 import { useState } from 'react'
 
 export default function Run() {
@@ -17,6 +18,8 @@ export default function Run() {
   // La consola en crudo ocupaba el 70% de la vista sin que nadie la lea de un
   // vistazo. Se pliega por defecto y se abre sola en cuanto hay algo que ver.
   const [showConsole, setShowConsole] = useState(false)
+  const [preflight, setPreflight] = useState<PreflightReport | null>(null)
+  const [checking, setChecking] = useState(false)
   const consoleRef = useRef<HTMLDivElement>(null)
   const progress = useRunProgress()
 
@@ -43,6 +46,15 @@ export default function Run() {
     if (!project) return
     const cs = selected.size > 0 ? Array.from(selected).sort((a, b) => a - b) : undefined
     await startRun(project.dir, { cases: cs, cname: project.cname })
+  }
+
+  async function check() {
+    setChecking(true)
+    try {
+      setPreflight(await runPreflight())
+    } finally {
+      setChecking(false)
+    }
   }
 
   async function loadLast() {
@@ -90,6 +102,10 @@ export default function Run() {
               aria-pressed={showConsole}
             >
               <Terminal className="h-4 w-4" /> {showConsole ? t.run.hideConsole : t.run.showConsole}
+            </Button>
+            <Button variant="outline" size="sm" onClick={check} disabled={running || checking}>
+              <ClipboardCheck className="h-4 w-4" />
+              {checking ? t.preflight.checking : t.preflight.title}
             </Button>
             <Button variant="outline" size="sm" onClick={loadLast} disabled={running}>
               <ListChecks className="h-4 w-4" /> {t.run.loadResults}
@@ -143,6 +159,7 @@ export default function Run() {
               queda en una columna legible en vez de estirar su botón de lado a
               lado de la pantalla. */}
           <div className={cn(!showConsole && 'max-w-2xl')}>
+            {preflight && <PreflightPanel report={preflight} className="mb-6" />}
             <MonitorControl />
           </div>
 
@@ -258,5 +275,67 @@ function StatusPill({ status }: { status: 'idle' | 'running' | 'done' | 'failed'
       {s.icon}
       {s.label}
     </span>
+  )
+}
+
+/**
+ * Resultado de «¿Todo listo?». Un bloque por comprobación, con icono además de
+ * color: esto se mira con el aula llena y proyectado. Los avisos (ámbar) no
+ * impiden empezar; los fallos (rojo) sí, y por eso el titular lo dice entero
+ * en vez de dejarlo a la suma de iconos.
+ */
+function PreflightPanel({ report, className }: { report: PreflightReport; className?: string }) {
+  const failed = report.items.some((i) => i.state === 'fail')
+  const warned = report.items.some((i) => i.state === 'warn')
+  const headline = failed
+    ? t.preflight.blocked
+    : warned
+      ? t.preflight.readyWithWarnings
+      : t.preflight.ready
+
+  return (
+    <Card className={cn('p-4', className)}>
+      <div
+        className={cn(
+          'flex items-center gap-2 text-sm font-semibold',
+          failed ? 'text-destructive-strong' : warned ? 'text-warning-strong' : 'text-success-strong'
+        )}
+      >
+        {failed ? (
+          <XCircle className="h-4 w-4 shrink-0" />
+        ) : warned ? (
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+        ) : (
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+        )}
+        {headline}
+      </div>
+      <ul className="mt-3 space-y-2.5">
+        {report.items.map((item) => (
+          <PreflightLine key={item.id} item={item} />
+        ))}
+      </ul>
+    </Card>
+  )
+}
+
+function PreflightLine({ item }: { item: PreflightItem }) {
+  const tone =
+    item.state === 'fail'
+      ? 'text-destructive-strong'
+      : item.state === 'warn'
+        ? 'text-warning-strong'
+        : 'text-success-strong'
+  const Icon = item.state === 'fail' ? XCircle : item.state === 'warn' ? AlertTriangle : CheckCircle2
+  return (
+    <li className="flex gap-2 text-sm">
+      <Icon className={cn('mt-0.5 h-4 w-4 shrink-0', tone)} aria-hidden />
+      <div className="min-w-0">
+        <div className={cn('font-medium', item.state === 'ok' ? 'text-foreground' : tone)}>
+          {item.label}
+        </div>
+        {item.detail && <div className="text-xs text-muted-foreground">{item.detail}</div>}
+      </div>
+    </li>
   )
 }

@@ -1,10 +1,11 @@
 import { useEffect } from 'react'
 import { useApp } from '../stores/app'
-import { type StudentRow } from './analytics'
+import { studentRows, type StudentRow } from './analytics'
 import { parseConfig } from './config'
 import { computeExpectedTotal, INITIAL_SCAN_STATE, parseTargetsFromCheckOutput } from './progress'
 import { buildMoodleCsv } from './moodleCsv'
 import { gradeRecordsFromResults, validateResultIdentity } from './integrity'
+import { updateStalls } from './stall'
 import type { LoadedResults, RunEvent, RunOptions } from '../../../shared/types'
 
 // Elimina códigos de color ANSI de la salida de teuton. La segunda pasada
@@ -20,7 +21,7 @@ export function stripAnsi(s: string): string {
  * Sin esto, importar una clase y ejecutar sin guardar evaluaría a los alumnos
  * antiguos (los del fichero) mientras la UI muestra los nuevos.
  */
-async function saveDraftsIfDirty(): Promise<void> {
+export async function saveDraftsIfDirty(): Promise<void> {
   const st = useApp.getState()
   if (!st.project || !st.dirty) return
   await window.teuton.saveProject({
@@ -406,7 +407,13 @@ async function loadAfterExit(
   try {
     const loaded = await window.teuton.loadResults(context.projectDir, testName ?? undefined)
     const res = { ...loaded, classId: context.classId, className: context.className }
-    if (isCurrentContext()) useApp.getState().setResults(res)
+    if (isCurrentContext()) {
+      useApp.getState().setResults(res)
+      // Quién no ha avanzado respecto al ciclo anterior. Solo cuenta si estos
+      // resultados son de la clase que hay en pantalla: si no, compararíamos a
+      // un alumno consigo mismo en otro grupo.
+      useApp.getState().setStalls(updateStalls(useApp.getState().stalls, studentRows(res)))
+    }
     // Recuerda qué clase produjo estos resultados: «cargar últimos resultados»
     // los atribuirá a ella aunque el profesor cambie de grupo entre medias.
     await window.teuton.setProjectMeta(context.projectDir, {
