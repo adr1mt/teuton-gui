@@ -9,6 +9,7 @@ import { startRun, cancelRun, reloadLatestResults } from '../lib/run'
 import { useRunProgress } from '../lib/progress'
 import { MonitorControl } from '../components/Monitor'
 import { runPreflight, type PreflightItem, type PreflightReport } from '../lib/preflight'
+import { useRedactor } from '../lib/redact'
 import { useState } from 'react'
 
 export default function Run() {
@@ -22,9 +23,12 @@ export default function Run() {
   const [checking, setChecking] = useState(false)
   const consoleRef = useRef<HTMLDivElement>(null)
   const progress = useRunProgress()
+  // La salida de Teutón nombra la IP de cada máquina en cada comprobación.
+  const hide = useRedactor()
+  const shownLog = useMemo(() => hide(run.log), [hide, run.log])
 
   function copyConsole() {
-    navigator.clipboard.writeText(run.log)
+    navigator.clipboard.writeText(shownLog)
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
   }
@@ -253,7 +257,7 @@ export default function Run() {
             {run.log.length === 0 ? (
               <span className="text-console-foreground/45">{t.run.empty}</span>
             ) : (
-              <pre className="whitespace-pre-wrap">{run.log}</pre>
+              <pre className="whitespace-pre-wrap">{shownLog}</pre>
             )}
           </div>
         </div>

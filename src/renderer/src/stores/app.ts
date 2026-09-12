@@ -83,6 +83,11 @@ interface AppState {
   attentionOnly: boolean
   /** Último fallo operativo que requiere atención del usuario. */
   operationalError: string | null
+  /**
+   * Modo proyector: todo un 25 % más grande y los datos de máquina tapados.
+   * Vive en el store (no en una vista) porque afecta a la app entera.
+   */
+  projector: boolean
 
   setTheme: (theme: Theme) => void
   toggleTheme: () => void
@@ -108,9 +113,11 @@ interface AppState {
   setActiveClass: (name: string | null, id?: string | null) => void
   setAttentionOnly: (v: boolean) => void
   setOperationalError: (message: string | null) => void
+  toggleProjector: () => void
 }
 
 const savedTheme: Theme = localStorage.getItem('teuton-theme') === 'light' ? 'light' : 'dark'
+const savedProjector = localStorage.getItem('teuton-proyector') === '1'
 
 /**
  * La clase `dark` se escribe aquí, junto al cambio de estado, y no en un efecto
@@ -127,6 +134,19 @@ function applyTheme(theme: Theme): void {
   }
 }
 applyTheme(savedTheme)
+
+/**
+ * El tamaño del modo proyector es un cambio del tipo base del documento, no una
+ * clase por componente: toda la interfaz está medida en `rem`, así que subir la
+ * raíz agranda por igual texto, iconos, márgenes y altura de fila. Hacerlo
+ * componente a componente habría dejado la mitad de la pantalla sin crecer.
+ */
+function applyProjector(on: boolean): void {
+  if (typeof document !== 'undefined') {
+    document.documentElement.classList.toggle('proyector', on)
+  }
+}
+applyProjector(savedProjector)
 
 const IDLE_RUN: RunState = {
   status: 'idle', log: '', runId: null, testName: null,
@@ -154,6 +174,7 @@ export const useApp = create<AppState>((set, get) => ({
   activeClassId: null,
   attentionOnly: false,
   operationalError: null,
+  projector: savedProjector,
 
   setTheme: (theme) => {
     localStorage.setItem('teuton-theme', theme)
@@ -249,5 +270,11 @@ export const useApp = create<AppState>((set, get) => ({
   setActiveClass: (activeClass, activeClassId = null) =>
     set((s) => (s.activeClassId === activeClassId ? { activeClass } : { activeClass, activeClassId, stalls: {} })),
   setAttentionOnly: (attentionOnly) => set({ attentionOnly }),
-  setOperationalError: (operationalError) => set({ operationalError })
+  setOperationalError: (operationalError) => set({ operationalError }),
+  toggleProjector: () => {
+    const next = !get().projector
+    localStorage.setItem('teuton-proyector', next ? '1' : '0')
+    applyProjector(next)
+    set({ projector: next })
+  }
 }))

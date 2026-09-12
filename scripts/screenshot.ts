@@ -26,6 +26,12 @@ app.whenReady().then(async () => {
     }
   })
   await win.loadFile(join(root, 'out/renderer/index.html'))
+  // Modo proyector: el store lo lee de localStorage al arrancar, así que hay
+  // que sembrarlo con la página ya cargada (mismo origen) y recargar.
+  if (process.env.SHOT_PROJECTOR) {
+    await win.webContents.executeJavaScript("localStorage.setItem('teuton-proyector','1')")
+    await win.loadFile(join(root, 'out/renderer/index.html'))
+  }
   await new Promise((r) => setTimeout(r, 3500))
   const img = await win.webContents.capturePage()
   writeFileSync(OUT, img.toPNG())

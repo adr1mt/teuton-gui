@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   Loader2
   , X
+  , Projector
 } from 'lucide-react'
 import { useApp, type View } from './stores/app'
 import { cn } from './lib/utils'
@@ -57,6 +58,8 @@ export default function App() {
 function AppBody() {
   const { theme, view, setView, toggleTheme, project, teutonStatus, setTeutonStatus, dirty } =
     useApp()
+  const projector = useApp((s) => s.projector)
+  const toggleProjector = useApp((s) => s.toggleProjector)
   const setGrading = useApp((s) => s.setGrading)
   const setDefaultGlobals = useApp((s) => s.setDefaultGlobals)
   const runStatus = useApp((s) => s.run.status)
@@ -176,6 +179,23 @@ function AppBody() {
             </div>
           )}
           <TeutonBadge />
+          {/* Junto al tema, no en Ajustes: se enciende al empezar el examen,
+              con el aula ya delante, y hay que poder apagarlo igual de rápido
+              cuando el profesor vuelve a necesitar ver una IP. */}
+          <button
+            onClick={toggleProjector}
+            aria-pressed={projector}
+            title={projector ? t.projector.hintOn : undefined}
+            className={cn(
+              'flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs transition-colors',
+              projector
+                ? 'bg-primary/20 font-medium text-white'
+                : 'text-sidebar-foreground/60 hover:bg-white/5 hover:text-white'
+            )}
+          >
+            <Projector className="h-4 w-4" />
+            {projector ? t.projector.off : t.projector.on}
+          </button>
           <button
             onClick={toggleTheme}
             className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs text-sidebar-foreground/60 transition-colors hover:bg-white/5 hover:text-white"

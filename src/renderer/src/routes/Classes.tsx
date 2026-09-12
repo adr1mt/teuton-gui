@@ -14,9 +14,10 @@ import { t } from '../i18n/es'
 import { Button, Card, ConfirmDialog, CustomFieldEntry, Input, ViewHeader } from '../components/ui'
 import { cn } from '../lib/utils'
 import { CLASS_COMMON_FIELDS, CLASS_FIXED_FIELD } from '../lib/fields'
-import { isSecretColumn } from '../lib/config'
+import { isMachineColumn, isSecretColumn } from '../lib/config'
 import type { ClassRoster, Student } from '../../../shared/types'
 import { validateRosterIdentity } from '../lib/integrity'
+import { useApp } from '../stores/app'
 
 function emptyClass(): ClassRoster {
   return { id: crypto.randomUUID(), name: '', students: [], createdAt: 0, updatedAt: 0 }
@@ -48,6 +49,7 @@ export default function Classes() {
   const [showAddField, setShowAddField] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<ClassRoster | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const projector = useApp((s) => s.projector)
 
   useEffect(() => {
     window.teuton.listClasses().then(setClasses).catch((cause) => {
@@ -324,7 +326,9 @@ export default function Classes() {
                           />
                         </td>
                         {fCols.map((col) => {
-                          const secret = isSecretColumn(col)
+                          // La lista de clase es la tabla con TODAS las IPs del
+                          // grupo: proyectada, es el mapa de la red del aula.
+                          const secret = isSecretColumn(col) || (projector && isMachineColumn(col))
                           return (
                             <td key={col} className="border-l border-border p-0">
                               <input

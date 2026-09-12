@@ -137,3 +137,12 @@ export function caseColumns(cases: ConfigCase[]): string[] {
 export function isSecretColumn(key: string): boolean {
   return /pass|secret|token|key/i.test(key)
 }
+
+/**
+ * ¿Es la dirección de una máquina? Solo se tapa en modo proyector: fuera de él
+ * el profesor necesita verla y teclearla, y una IP no es un secreto salvo
+ * proyectada en la pared del aula delante de toda la clase.
+ */
+export function isMachineColumn(key: string): boolean {
+  return /(^|_)ip\d*$/i.test(key)
+}

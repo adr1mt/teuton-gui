@@ -35,7 +35,7 @@ perder datos; lo siguiente debe salir de usar la app en clase.
   (`prevent-display-sleep`, porque el panel está proyectado) y lo suelta al
   pararlo o al salir. Sin esto el escritorio daba el equipo por inactivo —nadie
   toca el teclado durante un examen— y lo suspendía a las 2 h, justo al final.
-- Verificado: `npm run typecheck`, `npm test` (113), `npm run test:e2e` (20) y
+- Verificado: `npm run typecheck`, `npm test` (144), `npm run test:e2e` (25) y
   `./scripts/instalar.sh --forzar`. El escenario 15 prueba el AppImage ya
   empaquetado: arranca con ventana y la CSP bloquea un script inline.
 - Comprobado de paso: el `files` de electron-builder no mete dependencias de
@@ -68,6 +68,14 @@ perder datos; lo siguiente debe salir de usar la app en clase.
     sigue suspenso sube al principio de «Requieren atención» y lleva una marca
     pequeña en su fila y en Analíticas. Quien ya aprueba y deja de subir no
     cuenta: ha terminado.
+- **Modo proyector** (botón en la barra lateral, junto al tema). Enciende dos
+  cosas a la vez: toda la interfaz un 25 % más grande —se lee desde el fondo del
+  aula— y los datos de máquina tapados. Las IPs y las contraseñas desaparecen de
+  la tabla de configuración, de la lista de clase, de la consola de Ejecutar y de
+  las órdenes que salen en el detalle de un alumno (las de ssh llevan las dos en
+  la misma línea). Las contraseñas no se adivinan: se toman del config del
+  proyecto y se sustituyen por su valor exacto. Escenario `modo-proyector` de la
+  UAT; el teuton falso ahora imita una orden de ssh con IP y contraseña.
 
 ## In progress
 
@@ -85,8 +93,7 @@ cierra las dos dudas de diseño que quedaban abiertas: 15 columnas caben en el
 panel y `shortNameMap` ya desambigua con la inicial del apellido cuando dos
 comparten nombre de pila. No hay nada que decidir ahí.
 
-Mejoras propuestas y aún no hechas: un «modo proyector» que agrande el texto y
-oculte IPs y contraseñas. Las otras tres ya están hechas (ver arriba).
+No quedan mejoras propuestas pendientes: las cuatro están hechas.
 
 Pendiente de calibrar en clase: el umbral de «sin avanzar» son 3 vueltas
 (`STALL_CYCLES` en `lib/stall.ts`). Con un intervalo de 5 min son 15 minutos
@@ -98,9 +105,9 @@ Ojo al ejecutar la UAT: `npm run test:e2e` **no** compila. Hay que pasar por
 prueba el build anterior.
 
 La UAT termina con «Worker teardown timeout of 90000ms exceeded» además del
-«24 passed». Está comprobado que es anterior a estos cambios (sale igual con el
+«25 passed». Está comprobado que es anterior a estos cambios (sale igual con el
 árbol limpio): un proceso que Playwright no cierra al acabar el worker, no un
-test que falle. Sin diagnosticar.
+test que falle. En diagnóstico ahora mismo.
 
 ## References
 

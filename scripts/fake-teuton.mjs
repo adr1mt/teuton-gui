@@ -106,7 +106,10 @@ function caseReport(entry, index, grade) {
           description: `Comprobación ${t + 1}`,
           conn_type: 'local',
           duration: 0.01,
-          command: `echo comprobacion-${t + 1}`,
+          // La orden lleva IP y contraseña a propósito: es lo que Teutón
+          // escribe de verdad en una comprobación por ssh, y es lo que el modo
+          // proyector tiene que tapar.
+          command: `sshpass -p secreto-de-clase ssh usuario@192.168.1.${t + 10} echo comprobacion-${t + 1}`,
           output: t < passed ? 'ok' : 'mal',
           expected: 'ok',
           result: t < passed ? 1 : 0

@@ -4,6 +4,13 @@ export const t = {
     name: 'Teutón',
     tagline: 'Evaluación en el aula'
   },
+  projector: {
+    on: 'Modo proyector',
+    off: 'Salir del proyector',
+    hintOn: 'Letra grande. IPs y contraseñas tapadas.',
+    /** Aviso en las tablas donde el profesor sí espera ver la IP. */
+    masked: 'Modo proyector activo: las IPs y las contraseñas están tapadas.'
+  },
   nav: {
     home: 'Inicio',
     editor: 'Editor',

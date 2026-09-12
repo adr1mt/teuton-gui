@@ -6,7 +6,7 @@ clase aparecen una vez y no se pueden reproducir a voluntad: una máquina que no
 responde, dos ciclos que se pisan, un informe a medio escribir.
 
 ```bash
-npm run test:e2e          # los 24 escenarios sobre la app real
+npm run test:e2e          # los 25 escenarios sobre la app real
 npm test                  # 138 tests unitarios
 npm run verify:parsing -- <proyecto ya ejecutado>
 ```
@@ -54,9 +54,10 @@ npm run verify:parsing -- <proyecto ya ejecutado>
 | 22 | «¿Todo listo?» con el `config.yaml` roto | Bloquea y nombra el fichero, en vez de dejarlo para el primer ciclo |
 | 23 | «¿Todo listo?» con un alumno sin nombre | Bloquea: sin nombre su nota no se puede guardar ni exportar |
 | 24 | Un alumno con la máquina apagada | Su columna de la matriz sale como «máquina no responde», no como un examen todo en rojo |
+| 25 | Modo proyector encendido | La interfaz pasa a 20px de raíz y ni la IP ni la contraseña quedan visibles (tabla, consola ni orden ejecutada) |
 
 El 17 deja un Electron bloqueado en un diálogo nativo que hay que matar, así que
-la suite termina con un aviso de «worker teardown» aunque los 20 pasen y el
+la suite termina con un aviso de «worker teardown» aunque los 25 pasen y el
 código de salida sea 0. Es ruido, no un fallo.
 
 Y en los tests unitarios: `classes.json` sin permisos de lectura (las clases no
@@ -95,5 +96,6 @@ que prueba de verdad el preload CommonJS y la CSP incrustada. Necesita haber
 empaquetado antes (`npm run dist:linux` o `./scripts/instalar.sh --forzar`); si no
 hay build, se salta.
 
-4. **Proyector:** con 30 alumnos, comprobar a tres metros que se distinguen los
-   estados y que el nombre de pila basta para reconocer a cada uno.
+4. **Proyector:** con la clase entera y el **modo proyector encendido**,
+   comprobar a tres metros que se distinguen los estados y que el nombre de pila
+   basta para reconocer a cada uno.

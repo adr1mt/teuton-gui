@@ -6,6 +6,7 @@ import { Button, SectionTitle } from './ui'
 import { cn, formatDuration } from '../lib/utils'
 import { bestScore, formatGrade, passColor } from '../lib/grading'
 import { caseIndexFor, reevaluateStudent } from '../lib/run'
+import { useRedactor } from '../lib/redact'
 import type { StudentRow } from '../lib/analytics'
 
 export default function StudentDetail({
@@ -100,6 +101,8 @@ function TargetItem({
   target: import('../../../shared/types').TeutonTarget
 }) {
   const [open, setOpen] = useState(false)
+  // La orden y su salida llevan la IP del equipo y, por ssh, la contraseña.
+  const hide = useRedactor()
   const hasDetail = target.command || target.output || target.expected || target.result
   return (
     <div
@@ -130,10 +133,10 @@ function TargetItem({
       </button>
       {open && hasDetail && (
         <div className="space-y-2 border-t border-border/50 px-4 py-3 text-xs">
-          <DetailRow label={t.dashboard.command} value={target.command} mono />
-          <DetailRow label={t.dashboard.expected} value={target.expected} />
-          <DetailRow label={t.dashboard.result} value={target.result} />
-          <DetailRow label={t.dashboard.output} value={target.output} mono />
+          <DetailRow label={t.dashboard.command} value={hide(target.command ?? '')} mono />
+          <DetailRow label={t.dashboard.expected} value={hide(target.expected ?? '')} />
+          <DetailRow label={t.dashboard.result} value={hide(target.result ?? '')} />
+          <DetailRow label={t.dashboard.output} value={hide(target.output ?? '')} mono />
           <div className="flex gap-4 pt-1 text-muted-foreground">
             {target.conn_type && (
               <span>

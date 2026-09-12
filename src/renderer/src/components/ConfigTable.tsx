@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Plus, Trash2, Eye, EyeOff, Users, GraduationCap, ChevronDown } from 'lucide-react'
 import {
   caseColumns,
+  isMachineColumn,
   isSecretColumn,
   parseConfig,
   stringifyConfig,
@@ -24,6 +25,10 @@ export default function ConfigTable({
 }) {
   const { config, error } = parseConfig(yamlText)
   const [showSecrets, setShowSecrets] = useState(false)
+  // En modo proyector la pantalla está en la pared: ni «Mostrar claves» ni las
+  // IPs. El botón desaparece en vez de quedarse sin efecto, para que nadie lo
+  // pulse tres veces pensando que está roto.
+  const projector = useApp((s) => s.projector)
   const [classes, setClasses] = useState<ClassRoster[]>([])
   const [showImport, setShowImport] = useState(false)
   const [showAddField, setShowAddField] = useState(false)
@@ -197,6 +202,12 @@ export default function ConfigTable({
                   {key}
                 </label>
                 <Input
+                  // La sección global guarda la contraseña común de las
+                  // máquinas: se escribe en claro tal cual, y en modo proyector
+                  // también la IP.
+                  type={
+                    isSecretColumn(key) || (projector && isMachineColumn(key)) ? 'password' : 'text'
+                  }
                   aria-label={`Valor global ${key}`}
                   value={String(config.global[key] ?? '')}
                   onChange={(e) => updateGlobal(key, e.target.value)}
@@ -277,10 +288,16 @@ export default function ConfigTable({
                   </div>
                 )}
               </div>
-              <Button size="sm" variant="ghost" onClick={() => setShowSecrets((s) => !s)}>
-                {showSecrets ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                {showSecrets ? 'Ocultar' : 'Mostrar'} claves
-              </Button>
+              {projector ? (
+                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <EyeOff className="h-3.5 w-3.5" /> {t.projector.masked}
+                </span>
+              ) : (
+                <Button size="sm" variant="ghost" onClick={() => setShowSecrets((s) => !s)}>
+                  {showSecrets ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                  {showSecrets ? 'Ocultar' : 'Mostrar'} claves
+                </Button>
+              )}
             </div>
           </div>
 
@@ -309,7 +326,9 @@ export default function ConfigTable({
                       {rowIdx + 1}
                     </td>
                     {columns.map((col) => {
-                      const secret = isSecretColumn(col) && !showSecrets
+                      const secret =
+                        (isSecretColumn(col) && (!showSecrets || projector)) ||
+                        (projector && isMachineColumn(col))
                       return (
                         <td key={col} className="border-b border-l border-border p-0">
                           <input
