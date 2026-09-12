@@ -63,12 +63,13 @@ Nada.
 
 Usarla en un examen real. Comprobaciones manuales que quedan (`docs/UAT.md`):
 disco lleno, suspender a mano con el modo examen activo, y el proyector a tres
-metros con 30 alumnos. Las de cerrar ventana y cerrar sesión ya están
-automatizadas (escenarios 16-18); la del USB queda aparcada porque el profesor
-no usa USB.
+metros. Las de cerrar ventana y cerrar sesión ya están automatizadas
+(escenarios 16-18); la del USB queda aparcada porque el profesor no usa USB.
 
-Sigue pendiente de decidir en clase: si 16rem de ancho mínimo en la columna de
-preguntas es el bueno, y si con 30 alumnos el nombre de pila basta.
+Dimensión real confirmada: **15 alumnos por clase como máximo**, no 30. Eso
+cierra las dos dudas de diseño que quedaban abiertas: 15 columnas caben en el
+panel y `shortNameMap` ya desambigua con la inicial del apellido cuando dos
+comparten nombre de pila. No hay nada que decidir ahí.
 
 Mejoras propuestas y aún no hechas, por orden de valor: distinguir «máquina
 apagada» de «suspenso» en la matriz (hay que comprobar antes si el JSON de
