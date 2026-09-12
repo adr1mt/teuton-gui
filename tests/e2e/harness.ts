@@ -112,6 +112,23 @@ export async function launchApp(options: LaunchOptions = {}): Promise<Session> {
       } catch {
         /* ya no existe */
       }
+      // SIGKILL al proceso principal NO se lleva a sus hijos (gpu, red,
+      // renderer): quedan huérfanos, y como heredaron la tubería por la que
+      // habla Playwright, esta nunca se cierra y el worker se queda los 90 s de
+      // su límite al acabar la suite. Cada pasada dejaba además tres Electron
+      // vivos consumiendo ~300 MB. Se reconocen por el `--user-data-dir` de
+      // esta sesión, que es único; `pgrep -f` no vale (ver `livePids`).
+      await killByUserData(userData)
+      // Y el `teuton` que estuviera corriendo: es hijo del main, así que un
+      // SIGKILL al padre lo deja vivo con la tubería de Playwright en la mano.
+      // Sus pids están en los ficheros que el teuton falso deja en el userData.
+      for (const pid of await livePids(session)) {
+        try {
+          process.kill(pid, 'SIGKILL')
+        } catch {
+          /* ya no existe */
+        }
+      }
       // Hay que iniciar el cierre para que Playwright suelte la conexión (si no,
       // el worker tarda 90 s en terminar al final de la suite), pero sin
       // esperarlo: si el proceso main estaba bloqueado en un diálogo nativo,
@@ -130,6 +147,24 @@ export async function launchApp(options: LaunchOptions = {}): Promise<Session> {
     }
   }
   return session
+}
+
+/**
+ * Mata cuanto quede vivo de una sesión, hijos incluidos. Los identifica por el
+ * `--user-data-dir` temporal que solo usa esa sesión, leyendo `/proc`.
+ */
+async function killByUserData(userData: string): Promise<void> {
+  const entries = await fs.readdir('/proc').catch(() => [] as string[])
+  for (const entry of entries) {
+    if (!/^\d+$/.test(entry)) continue
+    const cmdline = await fs.readFile(join('/proc', entry, 'cmdline'), 'utf8').catch(() => '')
+    if (!cmdline.includes(userData)) continue
+    try {
+      process.kill(Number(entry), 'SIGKILL')
+    } catch {
+      /* ya no existe */
+    }
+  }
 }
 
 /** Abre el proyecto de pruebas desde la lista de recientes. */

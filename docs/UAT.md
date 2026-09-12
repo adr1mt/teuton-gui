@@ -56,9 +56,15 @@ npm run verify:parsing -- <proyecto ya ejecutado>
 | 24 | Un alumno con la máquina apagada | Su columna de la matriz sale como «máquina no responde», no como un examen todo en rojo |
 | 25 | Modo proyector encendido | La interfaz pasa a 20px de raíz y ni la IP ni la contraseña quedan visibles (tabla, consola ni orden ejecutada) |
 
-El 17 deja un Electron bloqueado en un diálogo nativo que hay que matar, así que
-la suite termina con un aviso de «worker teardown» aunque los 25 pasen y el
-código de salida sea 0. Es ruido, no un fallo.
+El 17 deja un Electron bloqueado en un diálogo nativo que hay que matar a lo
+bruto. Un SIGKILL al proceso principal **no** se lleva a sus hijos: quedaban
+vivos el `teuton` que estaba corriendo y los tres procesos internos de Electron
+(gpu, red, renderer), y como heredaron la tubería por la que habla Playwright,
+esta no se cerraba nunca y la suite terminaba con «Worker teardown timeout of
+90000ms exceeded» — 90 s de espera y seis procesos huérfanos por pasada
+(~300 MB cada trío). `kill()` los remata ahora: los de Electron por su
+`--user-data-dir`, que es único por sesión, y el `teuton` por los ficheros de
+pid. La suite pasó de 2,2 min a 38 s y no deja nada vivo.
 
 Y en los tests unitarios: `classes.json` sin permisos de lectura (las clases no
 pueden desaparecer ni sobreescribirse), 300 alumnos, dos guardados a la vez,

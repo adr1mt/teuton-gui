@@ -68,6 +68,12 @@ perder datos; lo siguiente debe salir de usar la app en clase.
     sigue suspenso sube al principio de «Requieren atención» y lleva una marca
     pequeña en su fila y en Analíticas. Quien ya aprueba y deja de subir no
     cuenta: ha terminado.
+- **La UAT ya no deja procesos vivos ni termina con el aviso de «worker
+  teardown»**. El escenario 17 mata la app a lo bruto (está bloqueada en un
+  diálogo nativo) y eso dejaba vivos sus hijos —el `teuton` en marcha y los tres
+  procesos internos de Electron—, que se quedaban con la tubería de Playwright:
+  90 s de espera al acabar y seis huérfanos por pasada. La suite baja de 2,2 min
+  a 38 s.
 - **Modo proyector** (botón en la barra lateral, junto al tema). Enciende dos
   cosas a la vez: toda la interfaz un 25 % más grande —se lee desde el fondo del
   aula— y los datos de máquina tapados. Las IPs y las contraseñas desaparecen de
@@ -103,11 +109,6 @@ parado; si en el examen real salta demasiado pronto o demasiado tarde, es el
 Ojo al ejecutar la UAT: `npm run test:e2e` **no** compila. Hay que pasar por
 `npm run build` (o `./scripts/instalar.sh --forzar` para el escenario 15) o se
 prueba el build anterior.
-
-La UAT termina con «Worker teardown timeout of 90000ms exceeded» además del
-«25 passed». Está comprobado que es anterior a estos cambios (sale igual con el
-árbol limpio): un proceso que Playwright no cierra al acabar el worker, no un
-test que falle. En diagnóstico ahora mismo.
 
 ## References
 
