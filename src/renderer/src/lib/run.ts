@@ -258,6 +258,9 @@ let monitorTimer: ReturnType<typeof setTimeout> | null = null
 export function startMonitor(dir: string, intervalMin: number, cname?: string): void {
   if (useApp.getState().monitor.active) return
   clearMonitorTimer()
+  // Sin esto el escritorio suspende el equipo por inactividad a mitad de examen
+  // (el profesor no toca el teclado) y la clase deja de corregirse.
+  void window.teuton.keepAwake(true).catch(() => undefined)
   useApp.getState().setMonitor({ active: true, intervalMin, nextRunAt: null, cycles: 1 })
   useApp.getState().setView('dashboard')
   void startRun(dir, { cname }) // primer ciclo inmediato (todos los alumnos)
@@ -265,6 +268,7 @@ export function startMonitor(dir: string, intervalMin: number, cname?: string): 
 
 export function stopMonitor(): void {
   clearMonitorTimer()
+  void window.teuton.keepAwake(false).catch(() => undefined)
   useApp.getState().setMonitor({ active: false, nextRunAt: null })
 }
 

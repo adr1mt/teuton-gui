@@ -6,7 +6,7 @@ clase aparecen una vez y no se pueden reproducir a voluntad: una máquina que no
 responde, dos ciclos que se pisan, un informe a medio escribir.
 
 ```bash
-npm run test:e2e          # los 18 escenarios sobre la app real
+npm run test:e2e          # los 19 escenarios sobre la app real
 npm test                  # 112 tests unitarios
 npm run verify:parsing -- <proyecto ya ejecutado>
 ```
@@ -47,6 +47,7 @@ npm run verify:parsing -- <proyecto ya ejecutado>
 | 16 | Cerrar la ventana sin nada en marcha | Se cierra sin preguntar (referencia del 17) |
 | 17 | Cerrar la ventana con una corrección en marcha | No se cierra: el aviso la retiene |
 | 18 | Cerrar la sesión del escritorio (SIGTERM) a mitad | Cero procesos vivos después |
+| 19 | Modo examen activo | Bloquea la suspensión del equipo, y la suelta al detenerlo |
 
 El 17 deja un Electron bloqueado en un diálogo nativo que hay que matar, así que
 la suite termina con un aviso de «worker teardown» aunque los 18 pasen y el
@@ -79,10 +80,10 @@ hacerlas sobre el **AppImage instalado**, no sobre el build de desarrollo.
    no usa USB: aparcada.)*
 2. **Disco lleno** (imagen loop de 1 MB montada como directorio del proyecto):
    guardar proyecto, récords y CSV deben avisar, no fallar en silencio.
-3. **Suspender el ordenador 10 minutos con el modo examen activo.** Al despertar,
-   el vigilante reanuda el ciclo en menos de 30 s en vez de quedarse en `0:00`.
-   Ojo: la app **no impide** que el escritorio suspenda por inactividad, y aquí
-   está configurado a 2 h con corriente — justo lo que dura un examen.
+3. **Suspender el ordenador a mano 10 minutos con el modo examen activo.** Al
+   despertar, el vigilante reanuda el ciclo en menos de 30 s en vez de quedarse
+   en `0:00`. (La suspensión *por inactividad* ya no puede ocurrir durante el
+   modo examen: la app la bloquea — escenario 19.)
 El escenario 15 es el único donde `app.isPackaged` es cierto, así que es el único
 que prueba de verdad el preload CommonJS y la CSP incrustada. Necesita haber
 empaquetado antes (`npm run dist:linux` o `./scripts/instalar.sh --forzar`); si no

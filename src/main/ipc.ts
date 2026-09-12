@@ -1,4 +1,4 @@
-import { ipcMain, dialog, shell, BrowserWindow, app } from 'electron'
+import { ipcMain, dialog, shell, BrowserWindow, app, powerSaveBlocker } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { promises as fs } from 'node:fs'
 import { pathToFileURL } from 'node:url'
@@ -238,6 +238,37 @@ function trackChild(child: ChildProcess): void {
   child.stderr?.on('error', () => undefined)
 }
 
+/**
+ * Mantiene el ordenador despierto mientras dura el modo examen.
+ *
+ * Durante el examen el profesor no toca el teclado —la app corrige sola y el
+ * panel se proyecta—, así que para el escritorio el equipo está inactivo y lo
+ * suspende por su cuenta: en GNOME, con corriente, a las 2 h por defecto, que es
+ * justo lo que dura un examen. Al suspenderse deja de corregirse a la clase.
+ *
+ * Se usa `prevent-display-sleep` (no `prevent-app-suspension`) porque además hay
+ * que impedir que la pantalla se apague: está proyectada.
+ */
+let keepAwakeId: number | null = null
+
+function setKeepAwake(active: boolean): void {
+  if (active) {
+    if (keepAwakeId === null || !powerSaveBlocker.isStarted(keepAwakeId)) {
+      keepAwakeId = powerSaveBlocker.start('prevent-display-sleep')
+    }
+    return
+  }
+  if (keepAwakeId !== null && powerSaveBlocker.isStarted(keepAwakeId)) {
+    powerSaveBlocker.stop(keepAwakeId)
+  }
+  keepAwakeId = null
+}
+
+/** Devuelve el control de la suspensión al salir de la aplicación. */
+export function releaseKeepAwake(): void {
+  setKeepAwake(false)
+}
+
 const CANCEL_WAIT_MS = 10_000
 
 /**
@@ -389,6 +420,11 @@ export function registerIpc(): void {
     })
 
     return { runId }
+  })
+
+  handle(IPC.keepAwake, (_e, active) => {
+    if (typeof active !== 'boolean') throw new Error('El valor de mantener despierto no es válido.')
+    setKeepAwake(active)
   })
 
   handle(IPC.runCancel, async (_e, value) => {

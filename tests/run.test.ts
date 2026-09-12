@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { checkMonitorHealth, handleRunEvent, leaveProject, startMonitor, startRun } from '../src/renderer/src/lib/run'
+import { checkMonitorHealth, handleRunEvent, leaveProject, startMonitor, startRun, stopMonitor } from '../src/renderer/src/lib/run'
 import { useApp } from '../src/renderer/src/stores/app'
 import type { TeutonApi } from '../src/shared/types'
 
@@ -7,7 +7,7 @@ function api(overrides: Partial<TeutonApi> = {}): TeutonApi {
   return {
     detect: vi.fn(), getTeutonPath: vi.fn(), setTeutonPath: vi.fn(), pickDirectory: vi.fn(),
     createProject: vi.fn(), openProject: vi.fn(), saveProject: vi.fn(), check: vi.fn().mockResolvedValue({ ok: true, output: '', exitCode: 0 }),
-    run: vi.fn(), cancelRun: vi.fn(), onRunEvent: vi.fn(), loadResults: vi.fn(), exportAs: vi.fn(), saveFileDialog: vi.fn(),
+    run: vi.fn(), cancelRun: vi.fn(), keepAwake: vi.fn().mockResolvedValue(undefined), onRunEvent: vi.fn(), loadResults: vi.fn(), exportAs: vi.fn(), saveFileDialog: vi.fn(),
     recentProjects: vi.fn(), removeRecent: vi.fn(), openPath: vi.fn(), openExternal: vi.fn(), getGrading: vi.fn(), setGrading: vi.fn(),
     getDefaultGlobals: vi.fn(), setDefaultGlobals: vi.fn(), listClasses: vi.fn(), saveClass: vi.fn(), deleteClass: vi.fn(),
     getRecords: vi.fn(), updateRecords: vi.fn(), resetRecords: vi.fn(), getProjectMeta: vi.fn(), setProjectMeta: vi.fn(), writeClassCsv: vi.fn(),
@@ -105,6 +105,20 @@ describe('orquestador de ejecución', () => {
     expect(checkMonitorHealth()).toBe(true)
     expect(useApp.getState().monitor.active).toBe(false)
     expect(useApp.getState().operationalError).toContain('proyecto')
+  })
+
+  it('el modo examen impide que el ordenador se suspenda, y lo suelta al parar', () => {
+    const keepAwake = vi.fn().mockResolvedValue(undefined)
+    window.teuton = api({ keepAwake, run: vi.fn(async (_d, _o, runId: string) => ({ runId })) })
+
+    startMonitor('/tmp/proyecto', 5, 'start')
+    // Durante el examen nadie toca el teclado: el escritorio da el equipo por
+    // inactivo y lo suspende (en GNOME, con corriente, a las 2 h por defecto),
+    // justo lo que dura un examen.
+    expect(keepAwake).toHaveBeenCalledWith(true)
+
+    stopMonitor()
+    expect(keepAwake).toHaveBeenLastCalledWith(false)
   })
 
   it('al dejar el proyecto cancela el proceso vivo y para el monitor', async () => {

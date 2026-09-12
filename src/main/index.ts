@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, session, shell } from 'electron'
 import { join } from 'node:path'
-import { hasActiveRuns, registerIpc, stopActiveRuns } from './ipc'
+import { hasActiveRuns, registerIpc, releaseKeepAwake, stopActiveRuns } from './ipc'
 
 // Evita cuelgues de compositor/GPU habituales en Linux (causa típica de
 // "la ventana no responde"). La app es ligera y no necesita aceleración HW.
@@ -130,16 +130,21 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   stopActiveRuns()
+  releaseKeepAwake()
   if (process.platform !== 'darwin') app.quit()
 })
 
-app.on('before-quit', stopActiveRuns)
+app.on('before-quit', () => {
+  stopActiveRuns()
+  releaseKeepAwake()
+})
 
 // Cerrar la sesión del escritorio o un `kill` no disparan 'before-quit', así que
 // sin esto los `teuton`/`ssh` lanzados quedan vivos tras apagar el ordenador.
 for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP'] as const) {
   process.on(signal, () => {
     stopActiveRuns()
+    releaseKeepAwake()
     app.quit()
   })
 }

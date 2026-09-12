@@ -10,6 +10,7 @@ export const IPC = {
   check: 'project:check',
   runStart: 'run:start',
   runCancel: 'run:cancel',
+  keepAwake: 'power:keepAwake',
   runEvent: 'run:event',
   loadResults: 'results:load',
   exportAs: 'export:as',

@@ -222,6 +222,8 @@ export interface TeutonApi {
   check: (dir: string, cname?: string) => Promise<CheckResult>
   run: (dir: string, options: RunOptions, runId: string) => Promise<RunHandle>
   cancelRun: (runId: string) => Promise<void>
+  /** Impide que el ordenador se suspenda y que la pantalla se apague. */
+  keepAwake: (active: boolean) => Promise<void>
   onRunEvent: (cb: (event: RunEvent) => void) => () => void
   loadResults: (dir: string, testName?: string) => Promise<LoadedResults>
   exportAs: (dir: string, format: ExportFormat) => Promise<CheckResult>

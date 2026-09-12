@@ -169,6 +169,10 @@ scheduled. The watchdog exists for what code alone can't fix: an `ssh` that hang
 and a suspended laptop, where the timer doesn't run and the countdown freezes at `0:00`. Leaving the
 project goes through `leaveProject()` (cancels the child, stops the timer); the store resetting `run` on
 its own only forgot the process, which kept evaluating the previous class and blocked the next run.
+While the monitor is active the app holds a `prevent-display-sleep` power blocker (`keepAwake` IPC): the
+teacher doesn't touch the keyboard during an exam, so the desktop counts the machine as idle and suspends
+it — GNOME defaults to 2 h on AC, exactly the length of an exam — and the screen is being projected, which
+is why it's display-sleep and not just app-suspension. Every exit path releases it (`releaseKeepAwake`).
 
 **Live progress bar** (`lib/progress.ts`). Teutón doesn't report machine-readable progress. It prints one
 character per check to stdout between the `Started at` and `Finished in` lines: `.` (pass), `F` (fail), `S`

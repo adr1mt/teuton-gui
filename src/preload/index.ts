@@ -11,6 +11,7 @@ const api: TeutonApi = {
   check: (dir, cname) => ipcRenderer.invoke(IPC.check, dir, cname),
   run: (dir, options, runId) => ipcRenderer.invoke(IPC.runStart, dir, options, runId),
   cancelRun: (runId) => ipcRenderer.invoke(IPC.runCancel, runId),
+  keepAwake: (active) => ipcRenderer.invoke(IPC.keepAwake, active),
   onRunEvent: (cb) => {
     const listener = (_e: unknown, event: RunEvent): void => cb(event)
     ipcRenderer.on(IPC.runEvent, listener)

@@ -31,7 +31,11 @@ Terminada. Lo siguiente debe salir de usar la app en un examen real.
   `noresume`, `huge`, `slow`, `notargets`, `badgrades`) + Playwright sobre la app
   real, con `userData` y proyecto temporales. Encontró un fallo real: dos
   arranques en el mismo tick dejaban huérfano el proceso del primero.
-- Verificado: `npm run typecheck`, `npm test` (112), `npm run test:e2e` (18) y
+- **El modo examen impide que el ordenador se suspenda** mientras está activo
+  (`prevent-display-sleep`, porque el panel está proyectado) y lo suelta al
+  pararlo o al salir. Sin esto el escritorio daba el equipo por inactivo —nadie
+  toca el teclado durante un examen— y lo suspendía a las 2 h, justo al final.
+- Verificado: `npm run typecheck`, `npm test` (113), `npm run test:e2e` (19) y
   `./scripts/instalar.sh --forzar`. El escenario 15 prueba el AppImage ya
   empaquetado: arranca con ventana y la CSP bloquea un script inline.
 - Comprobado de paso: el `files` de electron-builder no mete dependencias de
@@ -43,15 +47,11 @@ Nada.
 
 ## Next
 
-- **La app no impide que el escritorio suspenda por inactividad** (no usa
-  `powerSaveBlocker`). Aquí GNOME está en 2 h con corriente, justo lo que dura un
-  examen, y durante el modo examen nadie toca el teclado: el ordenador puede
-  suspenderse solo a mitad de corrección. Pendiente de decidir si se bloquea la
-  suspensión mientras el modo examen está activo.
-- Comprobaciones manuales que quedan (`docs/UAT.md`): disco lleno, suspensión con
-  el modo examen activo, y el proyector a tres metros con 30 alumnos. Las de
-  cerrar ventana y cerrar sesión ya están automatizadas (escenarios 16-18); la
-  del USB queda aparcada porque el profesor no usa USB.
+Usarla en un examen real. Comprobaciones manuales que quedan (`docs/UAT.md`):
+disco lleno, suspender a mano con el modo examen activo, y el proyector a tres
+metros con 30 alumnos. Las de cerrar ventana y cerrar sesión ya están
+automatizadas (escenarios 16-18); la del USB queda aparcada porque el profesor
+no usa USB.
 
 Sigue pendiente de decidir en clase: si 16rem de ancho mínimo en la columna de
 preguntas es el bueno, y si con 30 alumnos el nombre de pila basta.
