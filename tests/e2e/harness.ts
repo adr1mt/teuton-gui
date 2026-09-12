@@ -20,6 +20,9 @@ export interface Session {
   userData: string
   /** Cierra la app dejando los directorios (para inspeccionar lo que quedó). */
   quit(): Promise<void>
+  /** Mata la app sin hablar con ella y limpia. Para cuando el proceso main está
+   *  bloqueado en un diálogo nativo y cualquier `evaluate` se quedaría colgado. */
+  kill(): Promise<void>
   close(): Promise<void>
 }
 
@@ -101,6 +104,24 @@ export async function launchApp(options: LaunchOptions = {}): Promise<Session> {
         electronApp.quit()
       }).catch(() => undefined)
       await app.close().catch(() => undefined)
+    },
+    async kill() {
+      // Puede haber terminado ya por su cuenta: matarlo entonces lanza ESRCH.
+      try {
+        app.process().kill('SIGKILL')
+      } catch {
+        /* ya no existe */
+      }
+      // Hay que iniciar el cierre para que Playwright suelte la conexión (si no,
+      // el worker tarda 90 s en terminar al final de la suite), pero sin
+      // esperarlo: si el proceso main estaba bloqueado en un diálogo nativo,
+      // `close()` no vuelve nunca.
+      await Promise.race([
+        app.close().catch(() => undefined),
+        new Promise((resolve) => setTimeout(resolve, 2000))
+      ])
+      await fs.rm(userData, { recursive: true, force: true })
+      await fs.rm(projectDir, { recursive: true, force: true })
     },
     async close() {
       await session.quit()

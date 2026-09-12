@@ -31,7 +31,7 @@ Terminada. Lo siguiente debe salir de usar la app en un examen real.
   `noresume`, `huge`, `slow`, `notargets`, `badgrades`) + Playwright sobre la app
   real, con `userData` y proyecto temporales. Encontró un fallo real: dos
   arranques en el mismo tick dejaban huérfano el proceso del primero.
-- Verificado: `npm run typecheck`, `npm test` (112), `npm run test:e2e` (15) y
+- Verificado: `npm run typecheck`, `npm test` (112), `npm run test:e2e` (18) y
   `./scripts/instalar.sh --forzar`. El escenario 15 prueba el AppImage ya
   empaquetado: arranca con ventana y la CSP bloquea un script inline.
 - Comprobado de paso: el `files` de electron-builder no mete dependencias de
@@ -43,10 +43,15 @@ Nada.
 
 ## Next
 
-Usarla en un examen real. Quedan seis comprobaciones que necesitan una persona,
-listadas al final de `docs/UAT.md`: USB desconectado a mitad, disco lleno,
-suspender con el modo examen activo, cerrar ventana y cerrar sesión con una
-corrección en marcha, y mirar el proyector a tres metros con 30 alumnos.
+- **La app no impide que el escritorio suspenda por inactividad** (no usa
+  `powerSaveBlocker`). Aquí GNOME está en 2 h con corriente, justo lo que dura un
+  examen, y durante el modo examen nadie toca el teclado: el ordenador puede
+  suspenderse solo a mitad de corrección. Pendiente de decidir si se bloquea la
+  suspensión mientras el modo examen está activo.
+- Comprobaciones manuales que quedan (`docs/UAT.md`): disco lleno, suspensión con
+  el modo examen activo, y el proyector a tres metros con 30 alumnos. Las de
+  cerrar ventana y cerrar sesión ya están automatizadas (escenarios 16-18); la
+  del USB queda aparcada porque el profesor no usa USB.
 
 Sigue pendiente de decidir en clase: si 16rem de ancho mínimo en la columna de
 preguntas es el bueno, y si con 30 alumnos el nombre de pila basta.

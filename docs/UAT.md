@@ -6,7 +6,7 @@ clase aparecen una vez y no se pueden reproducir a voluntad: una máquina que no
 responde, dos ciclos que se pisan, un informe a medio escribir.
 
 ```bash
-npm run test:e2e          # los 15 escenarios sobre la app real
+npm run test:e2e          # los 18 escenarios sobre la app real
 npm test                  # 112 tests unitarios
 npm run verify:parsing -- <proyecto ya ejecutado>
 ```
@@ -44,6 +44,13 @@ npm run verify:parsing -- <proyecto ya ejecutado>
 | 13 | Rutas fuera del proyecto por el puente IPC | Rechazadas (`loadResults`, `saveProject`, `openPath`, `..`) |
 | 14 | Fijar `/bin/ls` como Teutón | Rechazado: «no responde como Teutón» |
 | 15 | La app **empaquetada** (`dist/linux-unpacked`) | Arranca con ventana y con `window.teuton`; la CSP bloquea un script inline |
+| 16 | Cerrar la ventana sin nada en marcha | Se cierra sin preguntar (referencia del 17) |
+| 17 | Cerrar la ventana con una corrección en marcha | No se cierra: el aviso la retiene |
+| 18 | Cerrar la sesión del escritorio (SIGTERM) a mitad | Cero procesos vivos después |
+
+El 17 deja un Electron bloqueado en un diálogo nativo que hay que matar, así que
+la suite termina con un aviso de «worker teardown» aunque los 18 pasen y el
+código de salida sea 0. Es ruido, no un fallo.
 
 Y en los tests unitarios: `classes.json` sin permisos de lectura (las clases no
 pueden desaparecer ni sobreescribirse), 300 alumnos, dos guardados a la vez,
@@ -68,19 +75,18 @@ No se automatizan porque necesitan hardware o permisos de administrador. Hay que
 hacerlas sobre el **AppImage instalado**, no sobre el build de desarrollo.
 
 1. **Proyecto en un USB y desconectarlo a mitad de ciclo.** El aviso debe
-   explicar que no se pudo guardar; las notas siguen en pantalla.
+   explicar que no se pudo guardar; las notas siguen en pantalla. *(El profesor
+   no usa USB: aparcada.)*
 2. **Disco lleno** (imagen loop de 1 MB montada como directorio del proyecto):
    guardar proyecto, récords y CSV deben avisar, no fallar en silencio.
-3. **Suspender el portátil 10 minutos con el modo examen activo.** Al despertar,
+3. **Suspender el ordenador 10 minutos con el modo examen activo.** Al despertar,
    el vigilante reanuda el ciclo en menos de 30 s en vez de quedarse en `0:00`.
+   Ojo: la app **no impide** que el escritorio suspenda por inactividad, y aquí
+   está configurado a 2 h con corriente — justo lo que dura un examen.
 El escenario 15 es el único donde `app.isPackaged` es cierto, así que es el único
 que prueba de verdad el preload CommonJS y la CSP incrustada. Necesita haber
 empaquetado antes (`npm run dist:linux` o `./scripts/instalar.sh --forzar`); si no
 hay build, se salta.
 
-4. **Cerrar la ventana con una corrección en marcha.** Sale el aviso modal; al
-   confirmar no queda ningún `teuton` ni `ssh` vivo (`ps aux | grep teuton`).
-5. **Cerrar la sesión del escritorio** con una evaluación en curso: tampoco
-   deben quedar procesos.
-6. **Proyector:** con 30 alumnos, comprobar a tres metros que se distinguen los
+4. **Proyector:** con 30 alumnos, comprobar a tres metros que se distinguen los
    estados y que el nombre de pila basta para reconocer a cada uno.
