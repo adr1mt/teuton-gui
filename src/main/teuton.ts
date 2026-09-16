@@ -1,11 +1,12 @@
 import { spawn, execFile } from 'node:child_process'
 import type { ExecFileOptionsWithStringEncoding } from 'node:child_process'
 import { promisify } from 'node:util'
-import { basename, join, delimiter, isAbsolute } from 'node:path'
+import { join, delimiter, isAbsolute } from 'node:path'
 import { readdirSync, existsSync, constants } from 'node:fs'
 import { access } from 'node:fs/promises'
 import type { TeutonPathSource, TeutonStatus } from '../shared/types'
 import { getTeutonPath } from './store'
+import { readOutputLocation } from './results'
 
 const execFileAsync = promisify(execFile)
 
@@ -285,12 +286,15 @@ export async function runTeutonSync(
 export interface SpawnedRun {
   child: ReturnType<typeof spawn>
   testName: string
+  /** `tt_outdir` del config, relativo al proyecto, o null. */
+  outDir: string | null
 }
 
 /**
  * Lanza `teuton run` con streaming. Se ejecuta con cwd = directorio del proyecto
- * y ruta "." (modo directorio), de modo que la salida es determinista:
- * <dir>/var/<basename(dir)>/.
+ * y ruta "." (modo directorio). La salida va a var/<basename(dir)>/ salvo que
+ * el config fije `tt_testname` o `tt_outdir`: se leen ANTES de lanzar, que es
+ * el config con el que Teutón va a ejecutar.
  */
 export async function spawnRun(
   dir: string,
@@ -301,6 +305,7 @@ export async function spawnRun(
     throw new Error('teuton no está instalado o no se encuentra en el PATH.')
   }
   const env = await teutonEnv()
+  const { testName, outDir } = await readOutputLocation(dir, options.cname)
   const args = ['run', '--export=json']
   if (options.cname) args.push(`--cname=${options.cname}`)
   if (options.cases && options.cases.length > 0) {
@@ -310,5 +315,5 @@ export async function spawnRun(
   // Un grupo separado permite cancelar también los procesos hijos de Teutón
   // (p. ej. Ruby/SSH), no únicamente el proceso lanzador.
   const child = spawn(path, args, { cwd: dir, env, detached: process.platform !== 'win32' })
-  return { child, testName: basename(dir) }
+  return { child, testName, outDir }
 }

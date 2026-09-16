@@ -67,7 +67,7 @@ vi.mock('../src/main/teuton', () => ({
     if (runtime.spawnError) throw runtime.spawnError
     const child = new FakeChild()
     runtime.spawned.push(child)
-    return { child, testName: 'proyecto' }
+    return { child, testName: 'proyecto', outDir: null }
   })
 }))
 
@@ -167,4 +167,13 @@ describe('ciclo de vida de las evaluaciones en main', () => {
     expect(child.killed).toEqual(['SIGTERM', 'SIGKILL'])
     expect(hasActiveRuns()).toBe(false)
   })
+
+  // S-04: tt_outdir viene del config del profesor y acaba en una ruta que main
+  // lee. Fuera del proyecto no se lee nada.
+  it('no lee informes de un tt_outdir fuera del proyecto', async () => {
+    await expect(call(IPC.loadResults, DIR, 'proyecto', '../otro')).rejects.toThrow(/fuera del proyecto/)
+    await expect(call(IPC.loadResults, DIR, 'proyecto', '/etc')).rejects.toThrow(/fuera del proyecto/)
+    await expect(call(IPC.loadResults, DIR, 'proyecto', '.')).rejects.toThrow(/fuera del proyecto/)
+  })
 })
+

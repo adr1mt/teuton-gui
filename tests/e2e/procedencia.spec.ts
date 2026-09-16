@@ -83,3 +83,36 @@ test('un resumen sin alumnos no resucita a los del grupo anterior (S-03)', async
     await session.close()
   }
 })
+
+/**
+ * S-04 (G6). Con `tt_testname` o `tt_outdir` propios, Teutón escribe en otra
+ * carpeta; la app leía siempre var/<carpeta del proyecto>, que conserva la
+ * pasada vieja, y el panel quedaba congelado en ella.
+ */
+for (const extra of ['tt_testname: examen2', 'tt_outdir: salida']) {
+  test(`con «${extra}» la pasada nueva se lee de donde la escribe Teutón (S-04)`, async () => {
+    const session = await launchApp({ meta: GRUPO_A })
+    const recordsFile = join(session.projectDir, '.teuton-gui-records.json')
+    const configFile = join(session.projectDir, 'config.yaml')
+    try {
+      await openProject(session)
+      await runOnce(session, GRUPO_A.activeClass)
+      await expect.poll(() => fs.readFile(recordsFile, 'utf-8').catch(() => ''), { timeout: 15_000 })
+        .toContain(GRUPO_A.activeClassId)
+
+      const config = await fs.readFile(configFile, 'utf-8')
+      await fs.writeFile(configFile, config.replace('global:\n', `global:\n  ${extra}\n`))
+      await fs.writeFile(join(session.projectDir, '.teuton-gui-meta.json'), JSON.stringify(GRUPO_B))
+      await reopenProject(session)
+      await runOnce(session, GRUPO_B.activeClass)
+
+      await expect.poll(async () => {
+        const records = JSON.parse(await fs.readFile(recordsFile, 'utf-8'))
+        return Object.keys(records.classes?.[`class:${GRUPO_B.activeClassId}`] ?? {}).length
+      }, { timeout: 15_000 }).toBe(4)
+      await expect(session.page.getByText('no ha producido informes nuevos')).toHaveCount(0)
+    } finally {
+      await session.close()
+    }
+  })
+}

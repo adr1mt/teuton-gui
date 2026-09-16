@@ -394,7 +394,7 @@ export function handleRunEvent(ev: RunEvent): void {
       runId: null,
       testName: ev.testName
     })
-    void loadAfterExit(ev.code, ev.testName, ev.startedAt, context)
+    void loadAfterExit(ev.code, ev.testName, ev.outDir, ev.startedAt, context)
   }
 }
 
@@ -436,6 +436,7 @@ function writtenSince(mtime: number | null | undefined, startedAt: number): bool
 async function loadAfterExit(
   code: number | null,
   testName: string | null,
+  outDir: string | null,
   startedAt: number,
   context: { projectDir: string | null; classId: string | null; className: string | null; partial: boolean }
 ): Promise<void> {
@@ -447,7 +448,7 @@ async function loadAfterExit(
   }
   if (isCurrentContext()) useApp.getState().setLoadingResults(true)
   try {
-    const loaded = await window.teuton.loadResults(context.projectDir, testName ?? undefined)
+    const loaded = await window.teuton.loadResults(context.projectDir, testName ?? undefined, outDir ?? undefined)
     const res = { ...loaded, classId: context.classId, className: context.className, partial: context.partial }
     if (!isFreshRun(res, code, startedAt)) {
       useApp.getState().setOperationalError(

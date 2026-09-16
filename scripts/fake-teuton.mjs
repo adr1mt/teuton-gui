@@ -218,6 +218,12 @@ async function main() {
   const realTestName = readGlobal('tt_testname') || testName
   const outDir = join(cwd, 'var', realTestName)
   const resumeDir = readGlobal('tt_outdir') ? join(cwd, readGlobal('tt_outdir')) : outDir
+  // Con tt_outdir el real solo crea ese directorio; si var/<tt_testname> no
+  // existe, sus hilos de exportación mueren con ENOENT y sale con 1.
+  if (resumeDir !== outDir && !existsSync(outDir)) {
+    process.stderr.write(`No such file or directory @ rb_sysopen - var/${realTestName}/case-01.txt (Errno::ENOENT)\n`)
+    return 1
+  }
   mkdirSync(outDir, { recursive: true })
   mkdirSync(resumeDir, { recursive: true })
 

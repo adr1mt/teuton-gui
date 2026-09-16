@@ -153,7 +153,7 @@ async function finishRun(code: number | null, loaded: LoadedResults, startedAt: 
   window.teuton = teuton
   useApp.getState().setActiveClass('Grupo B', 'clase-b')
   useApp.getState().setRun({ status: 'running', runId: 'r1', projectDir: '/tmp/proyecto', classId: 'clase-b', className: 'Grupo B', partial })
-  handleRunEvent({ runId: 'r1', type: 'exit', code, testName: 'proyecto', startedAt })
+  handleRunEvent({ runId: 'r1', type: 'exit', code, testName: 'proyecto', outDir: null, startedAt })
   await vi.waitFor(() => expect(useApp.getState().loadingResults).toBe(false))
   await new Promise((resolve) => setTimeout(resolve, 0))
   return teuton

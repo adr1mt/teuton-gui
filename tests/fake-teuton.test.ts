@@ -88,10 +88,16 @@ describe('teuton falso frente a Teutón 2.10.6', () => {
     expect(fake(['run', '.'])).toBe(0)
     expect(await fs.readdir(join(dir, 'var', 'examen2'))).toEqual(expect.arrayContaining(['resume.json', 'case-01.json']))
 
+    await fs.writeFile(join(dir, 'config.yaml'), config)
+    expect(fake(['run', '.'])).toBe(0)
     await fs.writeFile(join(dir, 'config.yaml'), config.replace('global:', 'global:\n  tt_outdir: salida'))
     expect(fake(['run', '.'])).toBe(0)
     expect(await fs.readdir(join(dir, 'salida'))).toContain('resume.json')
     expect(await fs.readdir(join(dir, 'salida'))).not.toContain('case-01.json')
+
+    // Como el real: con tt_outdir, si var/<tt_testname> no existe, sale con 1.
+    await fs.writeFile(join(dir, 'config.yaml'), config.replace('global:', 'global:\n  tt_outdir: salida\n  tt_testname: nuevo'))
+    expect(fake(['run', '.'])).toBe(1)
   })
 
   it('el fixture real se capturó con Teutón 2.10.6', () => {

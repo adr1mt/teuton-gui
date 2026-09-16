@@ -41,7 +41,7 @@ puede cambiar de modo entre pasadas (`setFakeMode`) y sembrar la clase activa.
 | S-01 | **RESOLVED** |
 | S-02 | **RESOLVED** |
 | S-03 | **RESOLVED** |
-| S-04 | pendiente |
+| S-04 | **RESOLVED** |
 | S-05 | pendiente |
 | S-06 | pendiente |
 | S-07 | pendiente |
@@ -111,6 +111,33 @@ puede cambiar de modo entre pasadas (`setFakeMode`) y sembrar la clase activa.
 - **Verificado:** `npm run typecheck`, `npm test` (166), `npm run build`,
   `npm run test:e2e` (31).
 
+### S-04 — RESOLVED
+
+- **Causa raíz:** `spawnRun` devolvía siempre `basename(dir)` como nombre de
+  test y `loadResults` leía `var/<carpeta>` si existía. Teutón escribe en
+  `tt_outdir || var/<tt_testname>` (y los casos siempre en
+  `var/<tt_testname>`, comprobado con 2.10.6).
+- **Solución:** `readOutputLocation` (`main/results.ts`) lee `tt_testname` y
+  `tt_outdir` del config antes de lanzar, buscándolo como Teutón
+  (`<cname>.json` y luego `.yaml`, claves con o sin dos puntos). El evento
+  `exit` lleva `testName` y `outDir`; `loadResults` lee el resumen de
+  `tt_outdir` y los casos solo de `var/<tt_testname>`. `tt_outdir` fuera del
+  proyecto se rechaza con error (`insideProject` en `ipc.ts`). «Cargar últimos
+  resultados» también resuelve `tt_outdir` desde el config.
+- **Dependencia:** necesita la guarda de S-02: con ella, antes de este arreglo
+  cada ciclo ya daba «no ha producido informes nuevos» en vez de congelarse
+  en silencio.
+- **Hallazgo real nuevo:** con `tt_outdir`, si `var/<tt_testname>` no existe,
+  Teutón 2.10.6 sale con 1 (`Errno::ENOENT`). La app lo muestra como pasada
+  fallida (S-02). El teuton falso lo imita.
+- **Tests:** `output-dir.test.ts` (5); `ipc-runs.test.ts` «no lee informes de
+  un tt_outdir fuera del proyecto»; `fake-teuton.test.ts` ampliado; E2E
+  `procedencia.spec.ts` «con tt_testname / tt_outdir … (S-04)» (antes: 0
+  alumnos guardados para el grupo B). Contrastado con Teutón 2.10.6 real sobre
+  un proyecto con `tt_outdir: salida` y `tt_testname: ex2`.
+- **Verificado:** `npm run typecheck`, `npm test` (172), `npm run build`,
+  `npm run test:e2e` (33).
+
 ## Findings consolidados
 
 Los ID de origen enlazan al detalle (escenario, camino, test y arreglo).
@@ -127,7 +154,7 @@ Los ID de origen enlazan al detalle (escenario, camino, test y arreglo).
 | ID | Origen | Qué pasa |
 |---|---|---|
 | S-03 | A1-03 | **RESOLVED.** `resume.json` con `cases: []` desactiva el filtro: los `case-NN.json` viejos entran como alumnos actuales en el historial. |
-| S-04 | A1-04 | Con `tt_testname`/`tt_outdir` y un `var/<carpeta>` viejo, cada ciclo lee la pasada vieja. |
+| S-04 | A1-04 | **RESOLVED.** Con `tt_testname`/`tt_outdir` y un `var/<carpeta>` viejo, cada ciclo lee la pasada vieja. |
 | S-05 | A1-05 | Historial ilegible → el CSV automático se reescribe con las notas de la última pasada, no con las mejores. |
 | S-06 | A2-01 | Si `.teuton-gui-meta.json` no se puede escribir, no se guarda ninguna nota en todo el examen; el aviso es genérico. |
 | S-07 | A3-01 | Un `teuton` colgado detiene el modo examen para siempre; el vigilante no actúa con `running`. `CLAUDE.md` afirma lo contrario. |

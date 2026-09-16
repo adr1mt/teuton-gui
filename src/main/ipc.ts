@@ -14,7 +14,7 @@ import {
   removeRecent,
   saveProject
 } from './projects'
-import { loadResults } from './results'
+import { loadResults, readOutputLocation } from './results'
 import {
   getGrading,
   setGrading,
@@ -113,6 +113,16 @@ function fileName(value: unknown, label: string): string {
   // y como nombre de fichero permitía escribir ficheros ocultos del proyecto.
   if (value.startsWith('.')) throw new Error(`${label} no es válido.`)
   return value
+}
+
+/** `tt_outdir` resuelto dentro del proyecto; fuera de él no se lee nada. */
+function insideProject(dir: string, value: unknown): string {
+  if (typeof value !== 'string' || !value || value.includes('\0')) throw new Error('El directorio de salida no es válido.')
+  const path = resolve(dir, value)
+  if (path === dir || !path.startsWith(dir + sep)) {
+    throw new Error(`El directorio de salida «${value}» (tt_outdir) está fuera del proyecto; la aplicación no puede leer los informes.`)
+  }
+  return path
 }
 
 function cname(value: unknown): string | undefined {
@@ -387,9 +397,10 @@ export function registerIpc(): void {
     reserveDir(safeDir)
     let child: ChildProcess
     let testName: string
+    let outDir: string | null
     const startedAt = Date.now()
     try {
-      ;({ child, testName } = await spawnRun(safeDir, safeOptions))
+      ;({ child, testName, outDir } = await spawnRun(safeDir, safeOptions))
     } catch (error) {
       busyDirs.delete(safeDir)
       throw error
@@ -420,7 +431,7 @@ export function registerIpc(): void {
     })
     child.on('close', (code) => {
       release()
-      broadcast({ runId, type: 'exit', code, testName, startedAt })
+      broadcast({ runId, type: 'exit', code, testName, outDir, startedAt })
     })
 
     return { runId }
@@ -437,9 +448,23 @@ export function registerIpc(): void {
     if (active) await cancelAndWait(active)
   })
 
-  handle(IPC.loadResults, (_e, dir, testName) =>
-    loadResults(projectDir(dir), testName === undefined ? undefined : fileName(testName, 'El nombre del test'))
-  )
+  handle(IPC.loadResults, async (_e, dir, testName, outDir) => {
+    const safeDir = projectDir(dir)
+    // «Cargar últimos resultados» no sabe dónde escribió la última pasada: con
+    // `tt_outdir` el resumen no está en var/ y se cargaría uno viejo de allí.
+    if (testName === undefined && outDir === undefined) {
+      const location = await readOutputLocation(safeDir)
+      if (location.outDir) {
+        return loadResults(safeDir, fileName(location.testName, 'El nombre del test'), insideProject(safeDir, location.outDir))
+      }
+      return loadResults(safeDir)
+    }
+    return loadResults(
+      safeDir,
+      testName === undefined ? undefined : fileName(testName, 'El nombre del test'),
+      outDir === undefined ? undefined : insideProject(safeDir, outDir)
+    )
+  })
 
   handle(IPC.exportAs, async (_e, dir, format) => {
     if (!EXPORT_FORMATS.has(format as ExportFormat)) throw new Error('El formato de exportación no es válido.')

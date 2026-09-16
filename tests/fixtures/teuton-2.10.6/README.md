@@ -25,3 +25,5 @@ respetar:
 7. `global.tt_outdir: D` → `resume.json`, `resume.txt` y `moodle.csv` van a
    `D/` (relativo al cwd, que la app fija en el proyecto), pero los
    `case-NN.json` siguen yendo a `var/<tt_testname>/` (`case/case.rb:37`).
+8. Con `tt_outdir`, Teutón solo crea `D/`: si `var/<tt_testname>/` no existe,
+   los hilos de exportación mueren con `Errno::ENOENT` y sale con código 1.

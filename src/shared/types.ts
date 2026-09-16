@@ -55,7 +55,7 @@ export type RunEvent =
   | { runId: string; type: 'stderr'; data: string }
   /** `startedAt`: hora (ms) justo antes de lanzar el proceso, para saber qué
    *  informes de var/ son de esta pasada: Teutón nunca borra los anteriores. */
-  | { runId: string; type: 'exit'; code: number | null; testName: string | null; startedAt: number }
+  | { runId: string; type: 'exit'; code: number | null; testName: string | null; outDir: string | null; startedAt: number }
   | { runId: string; type: 'error'; message: string }
 
 export interface RunHandle {
@@ -260,7 +260,8 @@ export interface TeutonApi {
   /** Impide que el ordenador se suspenda y que la pantalla se apague. */
   keepAwake: (active: boolean) => Promise<void>
   onRunEvent: (cb: (event: RunEvent) => void) => () => void
-  loadResults: (dir: string, testName?: string) => Promise<LoadedResults>
+  /** `outDir`: el `tt_outdir` del config (relativo al proyecto), si lo hay. */
+  loadResults: (dir: string, testName?: string, outDir?: string) => Promise<LoadedResults>
   exportAs: (dir: string, format: ExportFormat) => Promise<CheckResult>
   saveFileDialog: (defaultName: string, content: string) => Promise<string | null>
   recentProjects: () => Promise<RecentProject[]>

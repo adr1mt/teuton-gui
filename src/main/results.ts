@@ -1,5 +1,6 @@
 import { promises as fs } from 'node:fs'
 import { basename, join } from 'node:path'
+import yaml from 'js-yaml'
 import type {
   CaseReport,
   LoadedResults,
@@ -203,6 +204,49 @@ function parseResume(raw: unknown): ResumeReport | null {
   }
 }
 
+export interface OutputLocation {
+  /** `tt_testname`, o el nombre de la carpeta: los casos van a var/<testName>. */
+  testName: string
+  /** `tt_outdir` tal cual (relativo al proyecto), o null. Allí van resume.json y moodle.csv. */
+  outDir: string | null
+}
+
+/**
+ * Dónde escribe Teutón 2.10.6: `tt_outdir || var/<tt_testname>` para el
+ * resumen y SIEMPRE var/<tt_testname> para los casos (`case/case.rb`). Acepta
+ * las claves con dos puntos del estilo Ruby. Un config ilegible da la carpeta
+ * por defecto: Teutón fallará con él y esa pasada no se procesa.
+ */
+export function outputLocationFromConfig(dir: string, text: string): OutputLocation {
+  const fallback = { testName: basename(dir), outDir: null }
+  let doc: unknown
+  try {
+    doc = yaml.load(text)
+  } catch {
+    return fallback
+  }
+  const root = record(doc)
+  const global = record(root?.global ?? root?.[':global'])
+  const pick = (key: string): string | null => {
+    const value = global?.[key] ?? global?.[`:${key}`]
+    return value === null || value === undefined || value === false || value === '' ? null : String(value)
+  }
+  return { testName: pick('tt_testname') ?? fallback.testName, outDir: pick('tt_outdir') }
+}
+
+/** Lee el config como lo busca Teutón: <cname>.json y, si no existe, <cname>.yaml. */
+export async function readOutputLocation(dir: string, cname?: string): Promise<OutputLocation> {
+  const base = cname || 'config'
+  for (const file of [`${base}.json`, `${base}.yaml`]) {
+    try {
+      return outputLocationFromConfig(dir, await fs.readFile(join(dir, file), 'utf-8'))
+    } catch (error) {
+      if (!isMissing(error)) throw error
+    }
+  }
+  return { testName: basename(dir), outDir: null }
+}
+
 async function mtime(path: string, label: string, warnings: string[]): Promise<number | null> {
   try {
     return (await fs.stat(path)).mtimeMs
@@ -215,8 +259,14 @@ async function mtime(path: string, label: string, warnings: string[]): Promise<n
   }
 }
 
-export async function loadResults(dir: string, testName?: string): Promise<LoadedResults> {
-  const outputDir = await findOutputDir(dir, testName)
+/**
+ * `resumeDir` (ruta absoluta de `tt_outdir`, ya validada) separa el resumen de
+ * los casos, que entonces se leen SOLO de var/<testName>: buscar «el más
+ * reciente» ahí devolvería casos de otra pasada.
+ */
+export async function loadResults(dir: string, testName?: string, resumeDir?: string): Promise<LoadedResults> {
+  const casesDir = resumeDir ? join(dir, 'var', testName || basename(dir)) : await findOutputDir(dir, testName)
+  const outputDir = resumeDir ?? casesDir
   if (!outputDir) {
     return {
       testName: testName || '',
@@ -234,7 +284,7 @@ export async function loadResults(dir: string, testName?: string): Promise<Loade
   if (resumeRead.warning) warnings.push(resumeRead.warning)
   const resume = parseResume(resumeRead.value)
 
-  const entries = await fs.readdir(outputDir)
+  const entries = casesDir && await dirExists(casesDir) ? await fs.readdir(casesDir) : []
   let caseFiles = entries.filter((f) => /^case-\w+\.json$/.test(f)).sort()
   // Teutón sobrescribe los case-NN de la ejecución actual pero NO borra los de
   // ejecuciones anteriores con más casos (p.ej. al pasar de 4 alumnos a 1 tras
@@ -251,10 +301,10 @@ export async function loadResults(dir: string, testName?: string): Promise<Loade
   }
   const cases: CaseReport[] = []
   for (const f of caseFiles) {
-    const read = await readJson(join(outputDir, f), f)
+    const read = await readJson(join(casesDir!, f), f)
     if (read.warning) warnings.push(read.warning)
     const parsed = parseCaseReport(f, read.value)
-    if (parsed) cases.push({ ...parsed, generatedAt: await mtime(join(outputDir, f), f, warnings) })
+    if (parsed) cases.push({ ...parsed, generatedAt: await mtime(join(casesDir!, f), f, warnings) })
     else if (!read.warning) warnings.push(`${f}: contenido inesperado, se ha ignorado`)
   }
 
@@ -281,7 +331,7 @@ export async function loadResults(dir: string, testName?: string): Promise<Loade
   }
 
   return {
-    testName: basename(outputDir) || testName || '',
+    testName: (casesDir && basename(casesDir)) || testName || '',
     outputDir,
     resume,
     cases,
