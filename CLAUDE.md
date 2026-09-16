@@ -218,6 +218,9 @@ badge — but the matrix painted that student's whole column the same red as a s
 everything wrong. `buildMatrix` now carries `unreachable` per student and `MatrixCellView` renders their
 failing cells as a neutral offline glyph, keeping the red ✕ for real failures. Passing cells stay green
 (some targets don't need the connection) and a missing case report still wins with `?`.
+A zero with a connection error is *unevaluated*, not a grade (`isUnevaluated`): it is not stored in the
+record, the list shows `—`, and without a stored grade the student is left out of the Moodle CSV (an empty
+Moodle cell instead of a 0 nobody gave). A grade above zero is kept even with a host down.
 
 **Grading conversion** (`lib/grading.ts`). Teutón's native score is always 0–100. The GUI overlays a
 configurable piecewise-linear mapping — `(0,0)`, `(passScore, maxGrade/2)`, `(100, maxGrade)` — so a

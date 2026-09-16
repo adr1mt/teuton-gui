@@ -172,6 +172,7 @@ export const t = {
     average: 'Nota media',
     passRate: 'Aprobados',
     connErrors: 'Sin conexión',
+    unevaluated: 'Sin evaluar: la máquina no responde',
     withConnIssues: 'con hosts caídos',
     case: 'Caso',
     members: 'Alumno',

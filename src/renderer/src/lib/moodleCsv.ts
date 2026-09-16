@@ -1,5 +1,5 @@
 import type { GradeRecords, GradingSettings, LoadedResults } from '../../../shared/types'
-import { studentRows } from './analytics'
+import { isUnevaluated, studentRows } from './analytics'
 import { bestScore, convertGrade } from './grading'
 
 function escapeCsv(v: string): string {
@@ -26,6 +26,9 @@ export function buildMoodleCsv(
   const lines = ['MoodleID,Nota,Feedback']
   for (const r of studentRows(results)) {
     if (r.members === '-' || r.members === '') continue // casos saltados (tt_skip)
+    // Máquina sin conexión y sin nota previa: no hay nota que subir. Fuera del
+    // CSV, Moodle deja la casilla vacía en vez de un 0 que nadie ha puesto.
+    if (isUnevaluated(r) && records[r.members] === undefined) continue
     const rc = results.resume?.cases.find((c) => c.id === r.id)
     const id = rc?.moodleId && rc.moodleId !== 'NODATA' ? rc.moodleId : r.members
     const best = bestScore(r.grade, records[r.members])

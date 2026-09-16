@@ -20,16 +20,17 @@ Dejar la app lista para un examen real según el gate de
   proyecto ejecutado con Teutón 2.10.6 (completo y `--case=2`),
   `./scripts/instalar.sh --forzar` y escenario 15 con ese build.
 
+- Medium del gate: S-11 RESOLVED (máquina sin conexión = «sin evaluar», no 0).
+
 ## In progress
 
-Nada.
+Medium del gate: S-14, S-17, S-21 (en ese orden). Sin aceptar como riesgo.
 
 ## Next
 
 Puntos 2, 7 y 8 del gate de `SUMMARY.md`:
 
-1. Medium que pueden acabar en nota equivocada: S-11, S-14, S-17, S-21.
-   Corregirlos o aceptarlos por escrito aquí. No empezados.
+1. Corregir S-14, S-17 y S-21 (test que falla → arreglo → suite → doc).
 2. Ensayo de aula: 30 min de modo examen con máquinas reales, reevaluando a un
    alumno a mitad, y revisar a mano el CSV de `informes/` contra el panel.
    Tras una reevaluación el CSV no se reescribe hasta la siguiente pasada

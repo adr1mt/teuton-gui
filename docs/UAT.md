@@ -70,6 +70,7 @@ npm run verify:parsing -- <proyecto ya ejecutado>
 | 34 | `.teuton-gui-meta.json` con `chmod 000` | Las notas se guardan igual (S-06) |
 | 35 | Historial con `chmod 000` y una pasada peor | El CSV conserva las mejores notas (S-05) |
 | 36 | `teuton` colgado en modo examen (reloj simulado) | A los 15 min se cancela con aviso y llega el ciclo siguiente (S-07) |
+| 37 | Un alumno con la máquina apagada y una clase activa | No sale en el CSV como 0.00; la lista lo marca «sin evaluar» (S-11) |
 
 El 17 deja un Electron bloqueado en un diálogo nativo que hay que matar a lo
 bruto. Un SIGKILL al proceso principal **no** se lleva a sus hijos: quedaban

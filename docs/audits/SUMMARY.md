@@ -89,7 +89,35 @@ puede cambiar de modo entre pasadas (`setFakeMode`) y sembrar la clase activa.
 - **Verificado:** `npm run typecheck`, `npm test` (160), `npm run build`,
   `npm run test:e2e` (30).
 
-**Gate de la fase (2026-09-16):** `npm run typecheck`, `npm test` (180),
+## Fase de corrección (Medium del gate: S-11, S-14, S-17, S-21)
+
+| ID | Estado |
+|---|---|
+| S-11 | **RESOLVED** |
+| S-14 | Pendiente |
+| S-17 | Pendiente |
+| S-21 | Pendiente |
+
+### S-11 — RESOLVED
+
+- **Causa raíz:** `studentRows` ya sabía qué alumno tenía hosts sin conexión
+  (`connErrors`), pero `gradeRecordsFromResults` y `buildMoodleCsv` no lo
+  miraban: el 0 de Teutón entraba en el historial y salía en el CSV como
+  `0.00`, igual que un suspenso real.
+- **Semántica:** `isUnevaluated` (`lib/analytics.ts`) = algún host sin
+  conexión **y** nota 0. Ese 0 es «sin evaluar», no una nota: no se guarda en
+  el historial y, sin nota guardada, no sale en el CSV (Moodle deja la casilla
+  vacía). Con nota guardada se exporta la guardada, aunque sea un 0 de una
+  pasada con conexión. Una nota mayor que 0 con un host caído sí se guarda y
+  exporta: la ganó. La lista muestra «—» en vez de la nota y un aviso nombra a
+  quien quedará fuera del CSV; no bloquea la exportación del resto.
+- **Tests:** `unreachable.test.ts` (CSV sin nota previa, con nota previa, con
+  un 0 guardado, historial, lista de sin evaluar); E2E `maquina-apagada.spec.ts`
+  «no llega al CSV como un 0» (antes: 5 filas con Ana en 0.00).
+- **Verificado:** `npm run typecheck`, `npm test` (185), `npm run build`,
+  `npm run test:e2e` (37).
+
+**Gate de la fase Critical/High (2026-09-16):** `npm run typecheck`, `npm test` (180),
 `npm run build`, `npm run test:e2e` (36), `npm run verify:parsing` sobre un
 proyecto ejecutado con Teutón 2.10.6 (completo y `--case=2`; la aserción de
 filas cuenta ahora solo casos no saltados), `./scripts/instalar.sh --forzar` y
@@ -248,7 +276,7 @@ Los ID de origen enlazan al detalle (escenario, camino, test y arreglo).
 | ID | Origen | Qué pasa |
 |---|---|---|
 | S-10 | A1-06 | Nota ausente o no numérica en `resume.json` → 0 legítimo en pantalla, historial y CSV. |
-| S-11 | A1-07 | Alumno con la máquina apagada todo el examen → `0.00` en el CSV sin marca. |
+| S-11 | A1-07 | **RESOLVED.** Alumno con la máquina apagada todo el examen → `0.00` en el CSV sin marca. |
 | S-12 | A1-08 | «Cargar últimos resultados» puede atribuir la pasada a la clase anterior si `loadAfterExit` falló. |
 | S-13 | A2-02 | La copia de seguridad que falla solo queda en el log. |
 | S-14 | A2-03 | Un aviso de error se sustituye por el siguiente; los de «notas no guardadas» se pierden. |

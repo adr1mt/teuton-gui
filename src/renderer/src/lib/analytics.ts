@@ -76,6 +76,15 @@ export function studentRows(results: LoadedResults, passScore = 50): StudentRow[
   })
 }
 
+/**
+ * Sin evaluar: algún host no respondió y Teutón dio un 0. Ese 0 mide la red del
+ * aula, no al alumno (S-11), así que no se guarda ni se exporta como nota.
+ * Una nota mayor que 0 sí la ganó, aunque un host fallara.
+ */
+export function isUnevaluated(row: Pick<StudentRow, 'connErrors' | 'grade'>): boolean {
+  return row.connErrors > 0 && row.grade === 0
+}
+
 export interface Kpis {
   count: number
   average: number

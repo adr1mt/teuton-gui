@@ -46,6 +46,7 @@ import {
   computeKpis,
   buildMatrix,
   studentsNeedingAttention,
+  isUnevaluated,
   type StudentRow
 } from '../lib/analytics'
 import { bestScore, formatGrade, isPass, passColor } from '../lib/grading'
@@ -57,7 +58,7 @@ import { reloadLatestResults, caseIndexFor, reevaluateStudent } from '../lib/run
 import { sanitizeFileName } from '../../../shared/sanitize'
 import StudentDetail from '../components/StudentDetail'
 import { MonitorBanner } from '../components/Monitor'
-import { validateResultIdentity } from '../lib/integrity'
+import { unevaluatedStudents, validateResultIdentity } from '../lib/integrity'
 import type { RecordBackup } from '../../../shared/types'
 
 type ViewMode = 'list' | 'matrix'
@@ -117,6 +118,11 @@ export default function Dashboard() {
   const identityIssues = useMemo(
     () => (results ? validateResultIdentity(results) : []),
     [results]
+  )
+
+  const unevaluated = useMemo(
+    () => (results ? unevaluatedStudents(results, records) : []),
+    [results, records]
   )
 
   const visible = useMemo(() => {
@@ -481,6 +487,12 @@ export default function Dashboard() {
             <ul className="mt-1 list-disc pl-4">
               {identityIssues.map((issue) => <li key={`${issue.kind}-${issue.message}`}>{issue.message}</li>)}
             </ul>
+          </Banner>
+        )}
+        {unevaluated.length > 0 && (
+          <Banner tone="warning" icon={<AlertTriangle className="h-4 w-4 shrink-0" />}>
+            {unevaluated.length} alumno(s) sin evaluar porque su máquina no responde: {unevaluated.join(', ')}.
+            No saldrán en el CSV hasta que se les pueda evaluar; en Moodle su nota quedará vacía, no un 0.
           </Banner>
         )}
         {classMismatch && (
@@ -896,9 +908,16 @@ function RosterRow({
         </div>
 
         <div className="text-right">
-          <div className={cn('tnum text-figure font-bold leading-none', passColor(row.grade, grading))}>
-            {formatGrade(row.grade, grading)}
-          </div>
+          {/* Un 0 con la máquina caída no es una nota (S-11): se muestra «—». */}
+          {isUnevaluated(row) ? (
+            <div className="tnum text-figure font-bold leading-none text-muted-foreground" title={t.dashboard.unevaluated}>
+              —<span className="sr-only">{t.dashboard.unevaluated}</span>
+            </div>
+          ) : (
+            <div className={cn('tnum text-figure font-bold leading-none', passColor(row.grade, grading))}>
+              {formatGrade(row.grade, grading)}
+            </div>
+          )}
           {/* La nota que irá a Moodle es max(pasada actual, récord). Cuando el
               récord gana, se dice, para que nadie tenga que calcularlo. */}
           {record !== undefined && (

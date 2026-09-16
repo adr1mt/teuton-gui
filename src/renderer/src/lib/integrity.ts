@@ -1,6 +1,6 @@
 import type { ClassRoster, GradeRecords, LoadedResults } from '../../../shared/types'
 import { findDuplicateStudentIdentities } from '../../../shared/identity'
-import { studentRows } from './analytics'
+import { isUnevaluated, studentRows } from './analytics'
 
 export interface IntegrityIssue {
   kind: 'name-empty' | 'name-duplicate' | 'moodle-empty' | 'moodle-duplicate'
@@ -71,7 +71,16 @@ export function gradeRecordsFromResults(results: LoadedResults): {
   if (issues.length > 0) return { grades: {}, issues }
   const grades: GradeRecords = {}
   for (const row of studentRows(results)) {
-    if (row.members !== '-' && row.members.trim()) grades[row.members] = row.grade
+    if (row.members === '-' || !row.members.trim() || isUnevaluated(row)) continue
+    grades[row.members] = row.grade
   }
   return { grades, issues: [] }
+}
+
+/** Alumnos sin evaluar y sin nota guardada: el CSV los deja fuera (S-11). */
+export function unevaluatedStudents(results: LoadedResults, records: GradeRecords): string[] {
+  return studentRows(results)
+    .filter((row) => row.members !== '-' && row.members && isUnevaluated(row))
+    .filter((row) => records[row.members] === undefined)
+    .map((row) => row.members)
 }
