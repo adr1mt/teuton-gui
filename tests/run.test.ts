@@ -142,13 +142,16 @@ describe('orquestador de ejecución', () => {
  * Procesa el `exit` de una pasada del grupo B con los informes que devuelva
  * `loadResults` y espera a que termine `loadAfterExit`.
  */
-async function finishRun(code: number | null, loaded: LoadedResults, startedAt: number, partial = false): Promise<TeutonApi> {
+async function finishRun(
+  code: number | null, loaded: LoadedResults, startedAt: number, partial = false, overrides: Partial<TeutonApi> = {}
+): Promise<TeutonApi> {
   const teuton = api({
     loadResults: vi.fn().mockResolvedValue(loaded),
     setProjectMeta: vi.fn().mockResolvedValue(undefined),
     getRecords: vi.fn().mockResolvedValue({}),
     updateRecords: vi.fn(async (_d: string, grades: Record<string, number>) => ({ data: grades, persisted: true })),
-    writeClassCsv: vi.fn().mockResolvedValue('/tmp/proyecto/informes/x.csv')
+    writeClassCsv: vi.fn().mockResolvedValue('/tmp/proyecto/informes/x.csv'),
+    ...overrides
   })
   window.teuton = teuton
   useApp.getState().setActiveClass('Grupo B', 'clase-b')
@@ -286,5 +289,46 @@ describe('isPartialResume (recargar de disco)', () => {
 
   it('una fila skip de un alumno con tt_skip: true no hace parcial la pasada', () => {
     expect(isPartialResume(res, '---\ncases:\n- tt_members: Ana\n  tt_skip: true\n- tt_members: Luis\n')).toBe(false)
+  })
+})
+
+describe('orden de guardado al terminar (S-05, S-06)', () => {
+  const START = Date.UTC(2026, 8, 16, 12, 0, 0, 0)
+  const fresh = () => {
+    const res = loadedResults({
+      resumeCases: [resumeCase('01', 'Ana', 0, { moodleId: 'a1' })],
+      cases: [caseReport('01', 'Ana', 0, [{ id: '01' }])]
+    })
+    res.generatedAt = START + 2000
+    res.cases[0].generatedAt = START + 1000
+    return res
+  }
+
+  beforeEach(() => {
+    vi.useRealTimers()
+    useApp.getState().closeProject()
+    useApp.getState().setProject({
+      dir: '/tmp/proyecto', cname: 'start', script: '', config: '---\ncases: []\n', scriptFile: 'start.rb', configFile: 'config.yaml'
+    })
+  })
+
+  it('G9: si no se pueden escribir los metadatos, las notas se guardan igual', async () => {
+    const teuton = await finishRun(0, fresh(), START, false, {
+      setProjectMeta: vi.fn().mockRejectedValue(new Error('EACCES: permission denied'))
+    })
+    expect(teuton.updateRecords).toHaveBeenCalledWith('/tmp/proyecto', { Ana: 0 }, 'clase-b')
+    expect(teuton.writeClassCsv).toHaveBeenCalled()
+    expect(useApp.getState().operationalError).toContain('EACCES')
+  })
+
+  it('G8: con el historial ilegible no se reescribe el CSV con las notas de esta pasada', async () => {
+    useApp.getState().setRecords({ Ana: 100 })
+    const teuton = await finishRun(0, fresh(), START, false, {
+      updateRecords: vi.fn().mockResolvedValue({ data: { Ana: 0 }, persisted: false, warning: 'EACCES: historial' })
+    })
+    expect(teuton.writeClassCsv).not.toHaveBeenCalled()
+    expect(useApp.getState().records).toEqual({ Ana: 100 })
+    expect(useApp.getState().operationalError).toContain('notas')
+    expect(useApp.getState().operationalError).toContain('CSV')
   })
 })

@@ -42,8 +42,8 @@ puede cambiar de modo entre pasadas (`setFakeMode`) y sembrar la clase activa.
 | S-02 | **RESOLVED** |
 | S-03 | **RESOLVED** |
 | S-04 | **RESOLVED** |
-| S-05 | pendiente |
-| S-06 | pendiente |
+| S-05 | **RESOLVED** |
+| S-06 | **RESOLVED** |
 | S-07 | pendiente |
 | S-08 | pendiente |
 | S-09 | pendiente |
@@ -138,6 +138,24 @@ puede cambiar de modo entre pasadas (`setFakeMode`) y sembrar la clase activa.
 - **Verificado:** `npm run typecheck`, `npm test` (172), `npm run build`,
   `npm run test:e2e` (33).
 
+### S-05 y S-06 — RESOLVED (un commit: mismo orden de guardado)
+
+- **Causa raíz:** en `loadAfterExit`, `setProjectMeta` iba antes que los
+  récords y su fallo saltaba al `catch` general (S-06: ninguna nota guardada
+  en todo el examen). Y el CSV se construía con `outcome.data` aunque
+  `persisted` fuera `false`, que entonces son solo las notas de esta pasada
+  (S-05).
+- **Solución:** el fallo del meta se captura aparte y se avisa sin impedir el
+  guardado. Si el historial no se guarda, error que dice «No se han guardado
+  las notas…» y que el CSV no se ha reescrito; ni CSV ni cambio del historial
+  en pantalla.
+- **Tests:** `run.test.ts` «orden de guardado al terminar (S-05, S-06)» (G8,
+  G9); E2E `guardado.spec.ts` (meta con `chmod 000` → el historial se guarda;
+  historial con `chmod 000` y Ana a 0 → el CSV conserva su 10). Antes del
+  arreglo: historial vacío, y `Ana Ferrer…,10.00` pasaba a `0.00`.
+- **Verificado:** `npm run typecheck`, `npm test` (174), `npm run build`,
+  `npm run test:e2e` (35).
+
 ## Findings consolidados
 
 Los ID de origen enlazan al detalle (escenario, camino, test y arreglo).
@@ -155,8 +173,8 @@ Los ID de origen enlazan al detalle (escenario, camino, test y arreglo).
 |---|---|---|
 | S-03 | A1-03 | **RESOLVED.** `resume.json` con `cases: []` desactiva el filtro: los `case-NN.json` viejos entran como alumnos actuales en el historial. |
 | S-04 | A1-04 | **RESOLVED.** Con `tt_testname`/`tt_outdir` y un `var/<carpeta>` viejo, cada ciclo lee la pasada vieja. |
-| S-05 | A1-05 | Historial ilegible → el CSV automático se reescribe con las notas de la última pasada, no con las mejores. |
-| S-06 | A2-01 | Si `.teuton-gui-meta.json` no se puede escribir, no se guarda ninguna nota en todo el examen; el aviso es genérico. |
+| S-05 | A1-05 | **RESOLVED.** Historial ilegible → el CSV automático se reescribe con las notas de la última pasada, no con las mejores. |
+| S-06 | A2-01 | **RESOLVED.** Si `.teuton-gui-meta.json` no se puede escribir, no se guarda ninguna nota en todo el examen; el aviso es genérico. |
 | S-07 | A3-01 | Un `teuton` colgado detiene el modo examen para siempre; el vigilante no actúa con `running`. `CLAUDE.md` afirma lo contrario. |
 | S-08 | A5-01 | Restaurar una copia para una clase resucita las notas de práctica de otra clase ya reiniciada. |
 | S-09 | A5-02 | Restaurar con el historial sin permisos de lectura baja notas y dice «Notas restauradas». |

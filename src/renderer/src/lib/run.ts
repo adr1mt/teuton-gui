@@ -465,11 +465,21 @@ async function loadAfterExit(
       useApp.getState().setStalls(updateStalls(useApp.getState().stalls, studentRows(res)))
     }
     // Recuerda qué clase produjo estos resultados: «cargar últimos resultados»
-    // los atribuirá a ella aunque el profesor cambie de grupo entre medias.
-    await window.teuton.setProjectMeta(context.projectDir, {
-      lastRunClassId: context.classId,
-      lastRunClassName: context.className
-    })
+    // los atribuirá a ella aunque el profesor cambie de grupo entre medias. Si
+    // falla se avisa, pero NO impide guardar las notas: antes un meta sin
+    // permisos dejaba el examen entero sin historial.
+    try {
+      await window.teuton.setProjectMeta(context.projectDir, {
+        lastRunClassId: context.classId,
+        lastRunClassName: context.className
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      useApp.getState().setOperationalError(
+        `No se pudo anotar qué clase hizo esta pasada (${message}). Las notas se guardan igualmente, ` +
+        'pero «Cargar últimos resultados» podría atribuirlas a otra clase.'
+      )
+    }
     // Actualiza el récord histórico de mejor nota por alumno.
     const { grades, issues } = gradeRecordsFromResults(res)
     if (issues.length > 0) {
@@ -484,8 +494,16 @@ async function loadAfterExit(
     const grading = useApp.getState().grading
     const outcome = await window.teuton.updateRecords(context.projectDir, grades, context.classId ?? undefined)
     const rec = outcome.data
+    if (!outcome.persisted) {
+      // Sin historial guardado, `rec` son solo las notas de esta pasada: el CSV
+      // bajaría a quien sacó más antes y ha apagado la máquina.
+      useApp.getState().setOperationalError(
+        `No se han guardado las notas de esta pasada: ${outcome.warning || 'error desconocido'}. ` +
+        'El CSV de la clase no se ha reescrito para no bajar ninguna nota.'
+      )
+      return
+    }
     if (isCurrentContext()) useApp.getState().setRecords(rec)
-    if (!outcome.persisted) useApp.getState().setOperationalError(outcome.warning || 'No se pudieron guardar los récords.')
     // Genera/actualiza el CSV de Moodle de la clase activa con las MEJORES notas
     // (informes/moodle-<clase>.csv). Un fichero por clase: al pasar el mismo
     // examen a otro grupo se crea otro CSV y ambos coexisten como historial.
