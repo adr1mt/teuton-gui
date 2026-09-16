@@ -127,7 +127,24 @@ function createWindow(): void {
 // ventanas; un diálogo ahí dejaba el apagado colgado con el modo examen activo.
 let quitRequested = false
 
+// Una sola instancia (S-21): las colas de escritura (`serialized`) y la reserva
+// de proyectos en marcha viven en la memoria de cada proceso, así que dos
+// ventanas abiertas desde el menú se pisaban informes e historial. La segunda
+// sale sin abrir nada y devuelve la primera al frente. El bloqueo va por
+// `userData`, así que la UAT, con uno propio por escenario, no se ve afectada.
+const primaryInstance = app.requestSingleInstanceLock()
+if (!primaryInstance) app.exit(0)
+
+app.on('second-instance', () => {
+  const win = BrowserWindow.getAllWindows()[0]
+  if (!win) return
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.focus()
+})
+
 app.whenReady().then(() => {
+  if (!primaryInstance) return
   registerCsp()
   registerIpc()
   createWindow()

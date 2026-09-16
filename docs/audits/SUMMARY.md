@@ -96,7 +96,7 @@ puede cambiar de modo entre pasadas (`setFakeMode`) y sembrar la clase activa.
 | S-11 | **RESOLVED** |
 | S-14 | **RESOLVED** |
 | S-17 | **RESOLVED** |
-| S-21 | Pendiente |
+| S-21 | **RESOLVED** |
 
 ### S-11 — RESOLVED
 
@@ -164,6 +164,29 @@ puede cambiar de modo entre pasadas (`setFakeMode`) y sembrar la clase activa.
   manejador sigue como red de seguridad).
 - **Verificado:** `npm run typecheck`, `npm test` (192), `npm run build`,
   `npm run test:e2e` (40).
+
+### S-21 — RESOLVED
+
+- **Causa raíz:** no había `app.requestSingleInstanceLock()`. `serialized` y
+  la reserva de proyectos en marcha viven en la memoria de cada proceso, así
+  que dos arranques desde el menú corregían y guardaban a la vez sin verse.
+- **Solución:** bloqueo de instancia única en `main/index.ts`. La segunda sale
+  con `app.exit(0)` antes de crear ventana o IPC; la primera recibe
+  `second-instance` y restaura, muestra y enfoca su ventana. El bloqueo va por
+  `userData`: la UAT usa uno por escenario y no se ve afectada.
+- **Tests:** E2E `instancia-unica.spec.ts` con el build de desarrollo y con
+  `dist/linux-unpacked` (primera minimizada; la segunda sale con 0; la
+  primera sigue viva, con una ventana y restaurada). Antes: la segunda seguía
+  abierta a los 15 s. Además, a mano con el AppImage instalado: la segunda
+  sale con 0 y la primera sigue viva.
+- **Verificado:** `npm run typecheck`, `npm test` (192), `npm run build`,
+  `npm run test:e2e` (42).
+
+**Gate de la fase Medium (2026-09-16):** `npm run typecheck`, `npm test`
+(192), `npm run build`, `npm run test:e2e` (42, con los dos escenarios
+empaquetados sobre el build de `./scripts/instalar.sh --forzar`). Todo en
+verde. Cumplidos los puntos 1-6 del gate de examen; quedan el 7 (ensayo de
+aula) y el 8 (disco lleno y suspensión, a mano).
 
 **Gate de la fase Critical/High (2026-09-16):** `npm run typecheck`, `npm test` (180),
 `npm run build`, `npm run test:e2e` (36), `npm run verify:parsing` sobre un
@@ -334,7 +357,7 @@ Los ID de origen enlazan al detalle (escenario, camino, test y arreglo).
 | S-18 | A5-03 | `config.yaml` y `start.rb` se guardan sin `fsync`. |
 | S-19 | A5-04 | Las copias no aparecen si la carpeta del examen se ha movido o renombrado. |
 | S-20 | A5-05 | Renombrar a un alumno deja su mejor nota fuera del CSV (clave = nombre). |
-| S-21 | A5-06 | Sin bloqueo de instancia única: dos ventanas sobre el mismo proyecto se pisan informes e historial. |
+| S-21 | A5-06 | **RESOLVED.** Sin bloqueo de instancia única: dos ventanas sobre el mismo proyecto se pisan informes e historial. |
 
 ### Low
 
@@ -453,7 +476,7 @@ No hace falta volver a auditarlos mientras no cambie el código citado.
 La app se considera preparada cuando se cumple **todo** lo siguiente:
 
 1. **Corregidos:** S-01, S-02 (Critical) y S-03 a S-09 (High).
-2. **Corregidos o aceptados por escrito en `docs/HANDOFF.md`:** S-11 (máquina
+2. **Corregidos (RESOLVED, ninguno aceptado como riesgo):** S-11 (máquina
    apagada exportada como 0), S-14 (avisos que se pisan), S-17 (cierre entre
    ciclos) y S-21 (dos ventanas). Son los Medium que pueden terminar en una nota
    equivocada o en un examen sin corregir.

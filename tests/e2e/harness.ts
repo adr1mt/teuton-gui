@@ -35,6 +35,8 @@ export interface LaunchOptions {
   rawConfig?: string
   /** Contenido inicial de `.teuton-gui-meta.json` (clase activa). */
   meta?: Record<string, unknown>
+  /** Binario empaquetado en vez del build de `out/`. */
+  executablePath?: string
 }
 
 function configYaml(students: { name: string; moodleId?: string }[]): string {
@@ -87,7 +89,9 @@ export async function launchApp(options: LaunchOptions = {}): Promise<Session> {
   )
 
   const app = await electron.launch({
-    args: [join(REPO, 'out/main/index.js'), '--no-sandbox', `--user-data-dir=${userData}`],
+    ...(options.executablePath
+      ? { executablePath: options.executablePath, args: ['--no-sandbox', `--user-data-dir=${userData}`] }
+      : { args: [join(REPO, 'out/main/index.js'), '--no-sandbox', `--user-data-dir=${userData}`] }),
     env: {
       ...process.env,
       FAKE_TEUTON_MODE: options.mode ?? 'ok',

@@ -8,37 +8,29 @@ Dejar la app lista para un examen real según el gate de
 ## Completed
 
 - Auditoría A1-A5 hecha (`docs/audits/`): 30 findings.
-- **Fase de corrección de Critical y High terminada: S-01 a S-09 RESOLVED**,
-  cada uno con test que fallaba antes, en su propio commit (S-05/S-06 juntos).
-  Detalle, causa y verificación de cada uno en `SUMMARY.md`.
-- Infraestructura: informes reales de Teutón 2.10.6 en
-  `tests/fixtures/teuton-2.10.6/` y teuton falso fiel a ellos (filas `skip` de
-  `--case`, `tt_testname`/`tt_outdir`, modos `noreports`, `syntaxerror`,
-  `emptyresume`, `staleresume`; modo cambiable en caliente).
-- Verificado el 2026-09-16: `npm run typecheck`, `npm test` (180),
-  `npm run build`, `npm run test:e2e` (36), `npm run verify:parsing` sobre un
-  proyecto ejecutado con Teutón 2.10.6 (completo y `--case=2`),
-  `./scripts/instalar.sh --forzar` y escenario 15 con ese build.
-
-- Medium del gate: S-11 RESOLVED (máquina sin conexión = «sin evaluar», no 0),
-  S-14 RESOLVED (lista de avisos; los errores no se pisan),
-  S-17 RESOLVED (la X pregunta con el modo examen activo).
+- Critical y High: S-01 a S-09 RESOLVED.
+- Medium del gate: S-11, S-14, S-17 y S-21 RESOLVED, ninguno aceptado como
+  riesgo. Causa, arreglo, tests y riesgo residual de cada uno en `SUMMARY.md`.
+- Verificado el 2026-09-16: `npm run typecheck`, `npm test` (192),
+  `npm run build`, `npm run test:e2e` (42, empaquetada incluida),
+  `./scripts/instalar.sh --forzar` y dos arranques del AppImage instalado.
 
 ## In progress
 
-Medium del gate: S-21. Sin aceptar como riesgo.
+Nada.
 
 ## Next
 
-Puntos 2, 7 y 8 del gate de `SUMMARY.md`:
+Solo quedan las pruebas con personas y máquinas reales:
 
-1. Corregir S-21 (test que falla → arreglo → suite → doc).
-2. Ensayo de aula: 30 min de modo examen con máquinas reales, reevaluando a un
-   alumno a mitad, y revisar a mano el CSV de `informes/` contra el panel.
-   Tras una reevaluación el CSV no se reescribe hasta la siguiente pasada
-   completa (riesgo aceptado en S-01; el aviso lo dice).
-3. Comprobaciones manuales de `docs/UAT.md`: disco lleno y suspender con el
-   modo examen activo.
+1. Ensayo de aula: 30 min de modo examen con máquinas reales, reevaluando a un
+   alumno a mitad, y revisar a mano el CSV de `informes/` contra el panel
+   (incluido un alumno con la máquina apagada: «—» y fuera del CSV).
+2. Prueba manual de disco lleno (`docs/UAT.md`).
+3. Prueba manual de suspensión con el modo examen activo (`docs/UAT.md`).
+
+No tocar el resto de Medium (S-10, S-12, S-13, S-15, S-16, S-18-S-20) ni los
+Low hasta después del ensayo.
 
 Umbral por calibrar en clase: una pasada del modo examen se cancela tras
 10 min o 3 intervalos (`cycleLimitMs` en `lib/run.ts`). `STALL_CYCLES` (3)

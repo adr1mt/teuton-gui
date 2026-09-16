@@ -74,6 +74,7 @@ npm run verify:parsing -- <proyecto ya ejecutado>
 | 38 | Cerrar la ventana entre dos ciclos del modo examen | No se cierra: el aviso la retiene (S-17) |
 | 39 | Detener el modo examen y cerrar | Se cierra sin preguntar |
 | 40 | Cerrar la sesión (SIGTERM) con el modo examen activo | La app termina; ningún diálogo bloquea el apagado |
+| 41-42 | Abrir la app dos veces (desarrollo y **empaquetada**) con la primera minimizada | La segunda sale con 0; la primera sigue sola y vuelve al frente (S-21) |
 
 El 17 deja un Electron bloqueado en un diálogo nativo que hay que matar a lo
 bruto. Un SIGKILL al proceso principal **no** se lleva a sus hijos: quedaban
