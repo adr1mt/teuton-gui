@@ -66,7 +66,11 @@ if (pidFile) {
 }
 
 const args = process.argv.slice(2)
-const mode = process.env.FAKE_TEUTON_MODE || 'ok'
+// FAKE_TEUTON_MODEFILE permite cambiar de modo entre pasadas sin reiniciar la
+// app (la UAT hace una pasada buena y luego una que falla).
+const modeFile = process.env.FAKE_TEUTON_MODEFILE
+const fileMode = modeFile && existsSync(modeFile) ? readFileSync(modeFile, 'utf-8').trim() : ''
+const mode = fileMode || process.env.FAKE_TEUTON_MODE || 'ok'
 const command = args[0]
 const cwd = process.cwd()
 const testName = basename(cwd)

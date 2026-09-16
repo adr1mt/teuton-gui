@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { checkMonitorHealth, handleRunEvent, leaveProject, startMonitor, startRun, stopMonitor } from '../src/renderer/src/lib/run'
 import { useApp } from '../src/renderer/src/stores/app'
-import type { TeutonApi } from '../src/shared/types'
+import type { LoadedResults, TeutonApi } from '../src/shared/types'
+import { caseReport, loadedResults, resumeCase } from './helpers'
 
 function api(overrides: Partial<TeutonApi> = {}): TeutonApi {
   return {
@@ -134,5 +135,102 @@ describe('orquestador de ejecución', () => {
     expect(cancelRun).toHaveBeenCalledWith('run-vivo')
     expect(useApp.getState().monitor.active).toBe(false)
     expect(useApp.getState().run.runId).toBeNull()
+  })
+})
+
+/**
+ * Procesa el `exit` de una pasada del grupo B con los informes que devuelva
+ * `loadResults` y espera a que termine `loadAfterExit`.
+ */
+async function finishRun(code: number | null, loaded: LoadedResults, startedAt: number): Promise<TeutonApi> {
+  const teuton = api({
+    loadResults: vi.fn().mockResolvedValue(loaded),
+    setProjectMeta: vi.fn().mockResolvedValue(undefined),
+    getRecords: vi.fn().mockResolvedValue({}),
+    updateRecords: vi.fn(async (_d: string, grades: Record<string, number>) => ({ data: grades, persisted: true })),
+    writeClassCsv: vi.fn().mockResolvedValue('/tmp/proyecto/informes/x.csv')
+  })
+  window.teuton = teuton
+  useApp.getState().setActiveClass('Grupo B', 'clase-b')
+  useApp.getState().setRun({ status: 'running', runId: 'r1', projectDir: '/tmp/proyecto', classId: 'clase-b', className: 'Grupo B' })
+  handleRunEvent({ runId: 'r1', type: 'exit', code, testName: 'proyecto', startedAt })
+  await vi.waitFor(() => expect(useApp.getState().loadingResults).toBe(false))
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  return teuton
+}
+
+function grupoA(generatedAt: number, caseTime = generatedAt): LoadedResults {
+  const res = loadedResults({
+    resumeCases: [resumeCase('01', 'Ana', 100, { moodleId: 'a1' }), resumeCase('02', 'Luis', 100, { moodleId: 'a2' })],
+    cases: [caseReport('01', 'Ana', 100, [{ id: '01', check: true }]), caseReport('02', 'Luis', 100, [{ id: '01', check: true }])]
+  })
+  res.generatedAt = generatedAt
+  for (const c of res.cases) c.generatedAt = caseTime
+  return res
+}
+
+describe('procedencia de los informes (S-02)', () => {
+  const START = Date.UTC(2026, 8, 16, 10, 0, 0, 500)
+
+  beforeEach(() => {
+    vi.useRealTimers()
+    useApp.getState().closeProject()
+    useApp.getState().setProject({
+      dir: '/tmp/proyecto', cname: 'start', script: '', config: '---\ncases: []\n', scriptFile: 'start.rb', configFile: 'config.yaml'
+    })
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { teuton: api() } })
+  })
+
+  it('G2: una pasada que sale con error no guarda los informes que había en disco', async () => {
+    const teuton = await finishRun(1, grupoA(START - 3_600_000), START)
+    expect(teuton.updateRecords).not.toHaveBeenCalled()
+    expect(teuton.writeClassCsv).not.toHaveBeenCalled()
+    expect(teuton.setProjectMeta).not.toHaveBeenCalled()
+    expect(useApp.getState().operationalError).toContain('no ha producido informes nuevos')
+  })
+
+  it('G3: una pasada con código 0 que no escribió nada tampoco', async () => {
+    const teuton = await finishRun(0, grupoA(START - 3_600_000), START)
+    expect(teuton.updateRecords).not.toHaveBeenCalled()
+    expect(teuton.writeClassCsv).not.toHaveBeenCalled()
+    expect(teuton.setProjectMeta).not.toHaveBeenCalled()
+    expect(useApp.getState().results).toBeNull()
+    expect(useApp.getState().operationalError).toContain('no ha producido informes nuevos')
+  })
+
+  it('G3: sin resume.json no hay pasada que procesar', async () => {
+    const res = grupoA(START + 1000)
+    res.resume = null
+    res.generatedAt = null
+    const teuton = await finishRun(0, res, START)
+    expect(teuton.updateRecords).not.toHaveBeenCalled()
+    expect(useApp.getState().operationalError).toContain('no ha producido informes nuevos')
+  })
+
+  it('G5: un caso de otra pasada junto a un resumen nuevo no se procesa', async () => {
+    const res = grupoA(START + 2000)
+    res.cases[1].generatedAt = START - 3_600_000
+    const teuton = await finishRun(0, res, START)
+    expect(teuton.updateRecords).not.toHaveBeenCalled()
+    expect(teuton.writeClassCsv).not.toHaveBeenCalled()
+  })
+
+  it('una pasada buena y nueva se guarda', async () => {
+    const teuton = await finishRun(0, grupoA(START + 2000), START)
+    expect(teuton.setProjectMeta).toHaveBeenCalled()
+    expect(teuton.updateRecords).toHaveBeenCalledWith('/tmp/proyecto', { Ana: 100, Luis: 100 }, 'clase-b')
+    expect(teuton.writeClassCsv).toHaveBeenCalled()
+  })
+
+  it('un informe escrito unos milisegundos antes del arranque no es de esta pasada', async () => {
+    // Dos pasadas en el mismo segundo: redondear al segundo aceptaba la anterior.
+    const teuton = await finishRun(0, grupoA(START - 300.25), START)
+    expect(teuton.updateRecords).not.toHaveBeenCalled()
+  })
+
+  it('un sistema de ficheros con marcas de segundo no rechaza una pasada nueva', async () => {
+    // START lleva 500 ms; ext3/FAT truncan el mtime al segundo.
+    const teuton = await finishRun(0, grupoA(START - 500), START)
+    expect(teuton.updateRecords).toHaveBeenCalled()
   })
 })

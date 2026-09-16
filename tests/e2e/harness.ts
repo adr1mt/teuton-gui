@@ -33,6 +33,8 @@ export interface LaunchOptions {
   students?: { name: string; moodleId?: string }[]
   /** Sustituye el config.yaml entero (para YAML deliberadamente roto). */
   rawConfig?: string
+  /** Contenido inicial de `.teuton-gui-meta.json` (clase activa). */
+  meta?: Record<string, unknown>
 }
 
 function configYaml(students: { name: string; moodleId?: string }[]): string {
@@ -72,6 +74,10 @@ export async function launchApp(options: LaunchOptions = {}): Promise<Session> {
     'group "Comprobaciones simuladas" do\n  target "Comprobación 1"\n  run "echo ok"\n  expect "ok"\nend\n\nplay do\n  show\n  export\nend\n'
   )
 
+  if (options.meta) {
+    await fs.writeFile(join(projectDir, '.teuton-gui-meta.json'), JSON.stringify(options.meta))
+  }
+
   await fs.writeFile(join(userData, 'teuton-path.json'), JSON.stringify({ path: FAKE_TEUTON }))
   await fs.writeFile(
     join(userData, 'recent-projects.json'),
@@ -85,7 +91,8 @@ export async function launchApp(options: LaunchOptions = {}): Promise<Session> {
     env: {
       ...process.env,
       FAKE_TEUTON_MODE: options.mode ?? 'ok',
-      FAKE_TEUTON_PIDDIR: join(userData, 'pids')
+      FAKE_TEUTON_PIDDIR: join(userData, 'pids'),
+      FAKE_TEUTON_MODEFILE: join(userData, 'fake-mode')
     } as Record<string, string>
   })
   const page = await app.firstWindow()
@@ -173,6 +180,17 @@ export async function openProject(session: Session): Promise<void> {
   // barra lateral cuando ya hay uno abierto, y allí no es pulsable.
   await session.page.click(`main button:has-text("${session.projectName}")`)
   await session.page.waitForSelector('text=Test (start.rb)', { timeout: 10_000 })
+}
+
+/** Cambia el modo del teuton falso para las pasadas siguientes. */
+export async function setFakeMode(session: Session, mode: string): Promise<void> {
+  await fs.writeFile(join(session.userData, 'fake-mode'), mode)
+}
+
+/** Vuelve a Inicio y reabre el proyecto: recarga sus metadatos (clase activa). */
+export async function reopenProject(session: Session): Promise<void> {
+  await goTo(session, 'Inicio')
+  await openProject(session)
 }
 
 /** Abre la pestaña de configuración en modo tabla (la lista de alumnos). */

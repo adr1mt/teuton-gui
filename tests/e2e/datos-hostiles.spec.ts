@@ -83,10 +83,11 @@ test('nombres hostiles no rompen el CSV de Moodle', async () => {
     await session.page.click('button:has-text("Ejecutar test")')
     await expect(runningBadge(session)).toHaveCount(0, { timeout: 30_000 })
 
-    // El CSV automático se escribe al terminar el ciclo.
+    // El CSV automático se escribe al terminar el ciclo. Se espera al .csv, no
+    // a cualquier fichero: antes del rename solo existe el temporal `.tmp`.
     const informes = join(session.projectDir, 'informes')
     await expect
-      .poll(async () => (await fs.readdir(informes).catch(() => [])).length, { timeout: 20_000 })
+      .poll(async () => (await fs.readdir(informes).catch(() => [])).filter((f) => f.endsWith('.csv')).length, { timeout: 20_000 })
       .toBeGreaterThan(0)
     const file = (await fs.readdir(informes)).find((f) => f.endsWith('.csv'))!
     const csv = await fs.readFile(join(informes, file), 'utf-8')

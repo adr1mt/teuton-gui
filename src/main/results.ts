@@ -203,6 +203,18 @@ function parseResume(raw: unknown): ResumeReport | null {
   }
 }
 
+async function mtime(path: string, label: string, warnings: string[]): Promise<number | null> {
+  try {
+    return (await fs.stat(path)).mtimeMs
+  } catch (error) {
+    if (!isMissing(error)) {
+      const detail = error instanceof Error ? error.message : String(error)
+      warnings.push(`${label}: no se pudo consultar la fecha (${detail})`)
+    }
+    return null
+  }
+}
+
 export async function loadResults(dir: string, testName?: string): Promise<LoadedResults> {
   const outputDir = await findOutputDir(dir, testName)
   if (!outputDir) {
@@ -240,7 +252,7 @@ export async function loadResults(dir: string, testName?: string): Promise<Loade
     const read = await readJson(join(outputDir, f), f)
     if (read.warning) warnings.push(read.warning)
     const parsed = parseCaseReport(f, read.value)
-    if (parsed) cases.push(parsed)
+    if (parsed) cases.push({ ...parsed, generatedAt: await mtime(join(outputDir, f), f, warnings) })
     else if (!read.warning) warnings.push(`${f}: contenido inesperado, se ha ignorado`)
   }
 
@@ -254,14 +266,15 @@ export async function loadResults(dir: string, testName?: string): Promise<Loade
     }
   }
 
-  let generatedAt: number | null = null
-  try {
-    const s = await fs.stat(join(outputDir, 'resume.json'))
-    generatedAt = s.mtimeMs
-  } catch (error) {
-    if (!isMissing(error)) {
-      const detail = error instanceof Error ? error.message : String(error)
-      warnings.push(`resume.json: no se pudo consultar la fecha (${detail})`)
+  const generatedAt = await mtime(join(outputDir, 'resume.json'), 'resume.json', warnings)
+  // Teutón escribe los case-NN.json y DESPUÉS resume.json. Un caso más nuevo
+  // que su resumen significa que la pasada murió entre medias: el resumen es
+  // de otra pasada y la lista y la matriz enseñarían notas distintas.
+  if (resume && generatedAt !== null) {
+    for (const c of cases) {
+      if (c.generatedAt != null && c.generatedAt > generatedAt + 1000) {
+        warnings.push(`case-${c.caseId}.json: es más nuevo que resume.json; el resumen es de otra pasada`)
+      }
     }
   }
 

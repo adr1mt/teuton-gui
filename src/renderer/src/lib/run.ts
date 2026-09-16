@@ -388,13 +388,39 @@ export function handleRunEvent(ev: RunEvent): void {
       runId: null,
       testName: ev.testName
     })
-    void loadAfterExit(ev.code, ev.testName, context)
+    void loadAfterExit(ev.code, ev.testName, ev.startedAt, context)
   }
+}
+
+/**
+ * ¿Son estos informes de la pasada que acaba de terminar? Teutón nunca borra
+ * var/: con error de sintaxis sale con 1 sin escribir, sin bloque `play` sale
+ * con 0 sin escribir, y si muere entre los casos y el resumen deja casos nuevos
+ * con el resumen viejo. En todos esos casos lo que hay en disco es de OTRA
+ * pasada, quizá de otro grupo. Solo cuenta una salida con 0 cuyo resumen y
+ * casos se escribieron después del arranque.
+ */
+export function isFreshRun(res: LoadedResults, code: number | null, startedAt: number): boolean {
+  if (code !== 0 || !res.resume) return false
+  return writtenSince(res.generatedAt, startedAt) && res.cases.every((c) => writtenSince(c.generatedAt, startedAt))
+}
+
+/**
+ * La comparación es exacta: dos pasadas pueden caer en el mismo segundo. Solo
+ * un mtime que es un múltiplo exacto de segundo (FAT de un USB guarda de 2 en
+ * 2 s; ext3, de 1 en 1) se compara con el arranque redondeado a 2 s, porque ahí
+ * el sistema de ficheros no permite más precisión.
+ */
+function writtenSince(mtime: number | null | undefined, startedAt: number): boolean {
+  if (mtime == null) return false
+  if (mtime >= startedAt) return true
+  return mtime % 1000 === 0 && mtime >= Math.floor(startedAt / 2000) * 2000
 }
 
 async function loadAfterExit(
   code: number | null,
   testName: string | null,
+  startedAt: number,
   context: { projectDir: string | null; classId: string | null; className: string | null }
 ): Promise<void> {
   if (!context.projectDir) return
@@ -407,6 +433,13 @@ async function loadAfterExit(
   try {
     const loaded = await window.teuton.loadResults(context.projectDir, testName ?? undefined)
     const res = { ...loaded, classId: context.classId, className: context.className }
+    if (!isFreshRun(res, code, startedAt)) {
+      useApp.getState().setOperationalError(
+        `La evaluación no ha producido informes nuevos${code === 0 ? '' : ` (código ${code ?? 'sin código'})`}: ` +
+        'no se han guardado notas ni CSV. En pantalla siguen los resultados anteriores.'
+      )
+      return
+    }
     if (isCurrentContext()) {
       useApp.getState().setResults(res)
       // Quién no ha avanzado respecto al ciclo anterior. Solo cuenta si estos

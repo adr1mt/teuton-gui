@@ -26,6 +26,52 @@ Lo que sí está bien protegido (doble arranque, eventos tardíos, contexto
 congelado, escritura atómica con `fsync`, colas por fichero, huérfanos, CSP e
 IPC) aparece en «Riesgos descartados».
 
+## Fase de corrección (Critical y High)
+
+Infraestructura previa (commit `test: capture real Teutón 2.10.6 reports…`):
+informes reales en `tests/fixtures/teuton-2.10.6/` (pasada completa,
+`--case=2`, `cases: []`, con el comportamiento observado en su `README.md`),
+`fake-teuton.mjs` fiel al real (filas `skip` con `--case`, `tt_testname`,
+`tt_outdir`) y modos `noreports`, `syntaxerror`, `emptyresume`,
+`staleresume`; `tests/fake-teuton.test.ts` lo compara con los fixtures. La UAT
+puede cambiar de modo entre pasadas (`setFakeMode`) y sembrar la clase activa.
+
+| ID | Estado |
+|---|---|
+| S-01 | pendiente |
+| S-02 | **RESOLVED** |
+| S-03 | pendiente |
+| S-04 | pendiente |
+| S-05 | pendiente |
+| S-06 | pendiente |
+| S-07 | pendiente |
+| S-08 | pendiente |
+| S-09 | pendiente |
+
+### S-02 — RESOLVED
+
+- **Causa raíz:** `loadAfterExit` procesaba cualquier salida (código 1, `null`
+  o 0 sin escribir) y leía lo que hubiera en `var/`, que Teutón nunca borra.
+- **Solución:** main anota `startedAt` justo antes de lanzar y lo manda en el
+  evento `exit`; `loadResults` devuelve el `mtime` de cada `case-NN.json` y
+  avisa si alguno es más nuevo que `resume.json`. `isFreshRun` (`lib/run.ts`)
+  exige código 0, `resume.json` y todos los casos escritos después del
+  arranque; si no, error visible y ni pantalla, ni meta, ni historial, ni CSV.
+  La comparación es exacta: redondear al segundo aceptaba la pasada anterior
+  cuando las dos caían en el mismo segundo (lo destapó la UAT). Solo un `mtime`
+  múltiplo exacto de segundo (FAT, ext3) se compara con el arranque redondeado
+  a 2 s.
+- **Tests:** `run.test.ts` «procedencia de los informes (S-02)» (G2, G3, G5,
+  mismo segundo, FS de segundos, caso bueno); `results.test.ts` «avisa si un
+  case-NN.json es más nuevo que su resume.json»; E2E `procedencia.spec.ts`
+  (grupo A bien y luego grupo B con `crash`, `noreports`, `syntaxerror` y
+  `staleresume`). Antes del arreglo los cuatro E2E dejaban
+  `class:bbbbbbbb…` en el historial.
+- **De paso:** `datos-hostiles.spec.ts` esperaba cualquier fichero en
+  `informes/` y a veces leía el `.tmp` previo al `rename`; ahora espera el `.csv`.
+- **Verificado:** `npm run typecheck`, `npm test` (158), `npm run build`,
+  `npm run test:e2e` (29); `procedencia.spec.ts` ×8 sin fallos.
+
 ## Findings consolidados
 
 Los ID de origen enlazan al detalle (escenario, camino, test y arreglo).
@@ -35,7 +81,7 @@ Los ID de origen enlazan al detalle (escenario, camino, test y arreglo).
 | ID | Origen | Qué pasa |
 |---|---|---|
 | S-01 | A1-01 | **Reevaluar a un alumno reescribe el CSV de Moodle de la clase con un solo alumno.** Con Teutón real, `--case` deja 14 filas `"-"` que además salen en pantalla como alumnos con 0 (media, aprobados y «Requieren atención» falsos). El teuton falso no imita este formato. |
-| S-02 | A1-02 (+ A2 «exit ≠ 0») | **Una pasada que no escribe informes se procesa como nueva.** Exit 1 (error de sintaxis) o exit 0 (sin `play`) dejan los informes anteriores, que pueden ser de otra clase: sus notas entran en el historial de la clase actual y su CSV se escribe con los alumnos de la otra. Incluye el caso «casos nuevos + resumen viejo». |
+| S-02 | A1-02 (+ A2 «exit ≠ 0») | **RESOLVED.** **Una pasada que no escribe informes se procesa como nueva.** Exit 1 (error de sintaxis) o exit 0 (sin `play`) dejan los informes anteriores, que pueden ser de otra clase: sus notas entran en el historial de la clase actual y su CSV se escribe con los alumnos de la otra. Incluye el caso «casos nuevos + resumen viejo». |
 
 ### High
 

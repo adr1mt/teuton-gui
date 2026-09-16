@@ -387,6 +387,7 @@ export function registerIpc(): void {
     reserveDir(safeDir)
     let child: ChildProcess
     let testName: string
+    const startedAt = Date.now()
     try {
       ;({ child, testName } = await spawnRun(safeDir, safeOptions))
     } catch (error) {
@@ -419,7 +420,7 @@ export function registerIpc(): void {
     })
     child.on('close', (code) => {
       release()
-      broadcast({ runId, type: 'exit', code, testName })
+      broadcast({ runId, type: 'exit', code, testName, startedAt })
     })
 
     return { runId }

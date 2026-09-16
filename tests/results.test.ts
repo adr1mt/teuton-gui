@@ -199,4 +199,21 @@ describe('informes hostiles', () => {
     // quien tiene que aguantarlo es la vista (ver gradeDistribution).
     expect(loaded.resume?.cases.map((c) => c.grade)).toEqual([-25, 150])
   })
+
+  // G5: Teutón escribe los casos y DESPUÉS el resumen. Casos más nuevos que el
+  // resumen = la pasada murió entre medias y el resumen es de otra.
+  it('avisa si un case-NN.json es más nuevo que su resume.json', async () => {
+    dir = await makeProjectDir()
+    const out = await writeOutput(dir, 'dns', {
+      'resume.json': JSON.stringify(resumeJson([{ id: '01', members: 'pepito', grade: 100 }])),
+      'case-01.json': JSON.stringify(caseJson('pepito', 0, [{ id: '01' }]))
+    })
+    const old = new Date('2026-01-01T10:00:00Z')
+    await fs.utimes(join(out, 'resume.json'), old, old)
+
+    const res = await loadResults(dir)
+    expect(res.cases[0].generatedAt).toBeGreaterThan(old.getTime())
+    expect(res.warnings.join(' ')).toContain('case-01.json')
+    expect(res.warnings.join(' ')).toContain('resume.json')
+  })
 })

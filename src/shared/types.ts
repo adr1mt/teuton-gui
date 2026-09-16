@@ -53,7 +53,9 @@ export interface RunOptions {
 export type RunEvent =
   | { runId: string; type: 'stdout'; data: string }
   | { runId: string; type: 'stderr'; data: string }
-  | { runId: string; type: 'exit'; code: number | null; testName: string | null }
+  /** `startedAt`: hora (ms) justo antes de lanzar el proceso, para saber qué
+   *  informes de var/ son de esta pasada: Teutón nunca borra los anteriores. */
+  | { runId: string; type: 'exit'; code: number | null; testName: string | null; startedAt: number }
   | { runId: string; type: 'error'; message: string }
 
 export interface RunHandle {
@@ -91,6 +93,8 @@ export interface CaseReport {
   grade: number
   members: string
   raw: unknown
+  /** mtime (ms) del case-NN.json; null si no se pudo consultar. */
+  generatedAt?: number | null
 }
 
 /** Fila del resumen (resume.json → cases[]). */
