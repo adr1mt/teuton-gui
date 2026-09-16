@@ -39,6 +39,8 @@ export interface RunState {
   className: string | null
   /** Solo algunos alumnos (`--case`): no puede reescribir el CSV de la clase. */
   partial: boolean
+  /** Hora (ms) a la que arrancó; el vigilante del modo examen la usa para detectar cuelgues. */
+  startedAt: number | null
   /** Nº total de comprobaciones esperadas (para la barra de progreso), o null si no se pudo calcular. */
   expectedTotal: number | null
   /** Comprobaciones completadas, contadas de forma incremental por `appendRunLine` (ver `scanProgressChunk`). */
@@ -152,7 +154,7 @@ applyProjector(savedProjector)
 
 const IDLE_RUN: RunState = {
   status: 'idle', log: '', runId: null, testName: null,
-  projectDir: null, classId: null, className: null, partial: false, expectedTotal: null,
+  projectDir: null, classId: null, className: null, partial: false, startedAt: null, expectedTotal: null,
   done: 0, scan: INITIAL_SCAN_STATE
 }
 

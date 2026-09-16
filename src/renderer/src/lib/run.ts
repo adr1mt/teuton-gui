@@ -65,6 +65,7 @@ export async function startRun(dir: string, options: RunOptions): Promise<void> 
       status: 'running', log: '', runId, testName: null,
       projectDir: dir, classId: st.activeClassId, className: st.activeClass,
       partial: (options.cases?.length ?? 0) > 0,
+      startedAt: Date.now(),
       expectedTotal: null,
       // Cada ejecución (incluido cada ciclo de modo examen) arranca el contador
       // de progreso desde cero, con el escáner incremental reiniciado.
@@ -162,6 +163,10 @@ export async function reevaluateStudent(row: StudentRow): Promise<void> {
 
 export async function cancelRun(): Promise<void> {
   const { runId, projectDir } = useApp.getState().run
+  // Se anula ANTES de esperar: main emite el `exit` del proceso matado antes de
+  // resolver la cancelación, y con el runId aún activo se procesaba como una
+  // pasada terminada.
+  useApp.getState().setRun({ runId: null })
   try {
     if (runId) await window.teuton.cancelRun(runId)
   } catch (error) {
@@ -326,16 +331,36 @@ function runCycle(dir: string): void {
  * suspender el portátil, donde el temporizador no corre y el contador se queda
  * clavado en 0:00. Sin esto la clase deja de corregirse y la pantalla sigue
  * diciendo «activo».
+ *
+ * Teutón no pone tiempo máximo a los comandos (solo a la conexión SSH), así
+ * que una pasada que lleva más de `cycleLimitMs` sin terminar se cancela: la
+ * cancelación encadena el siguiente ciclo.
  */
 const WATCHDOG_INTERVAL_MS = 30_000
 const WATCHDOG_GRACE_MS = 60_000
+const MIN_CYCLE_LIMIT_MS = 10 * 60_000
 let processingExit = false
+
+/** Una pasada de 30 alumnos tarda pocos minutos; 10 min o 3 intervalos es un cuelgue. */
+function cycleLimitMs(intervalMin: number): number {
+  return Math.max(MIN_CYCLE_LIMIT_MS, 3 * intervalMs(intervalMin))
+}
 
 export function checkMonitorHealth(now = Date.now()): boolean {
   const st = useApp.getState()
   if (!st.monitor.active) return false
-  // Un ciclo en curso (proceso vivo o resultados cargándose) no es un parón.
-  if (st.run.status === 'running' || processingExit) return false
+  if (st.run.status === 'running') {
+    const limit = cycleLimitMs(st.monitor.intervalMin)
+    if (st.run.startedAt === null || now - st.run.startedAt <= limit) return false
+    st.setOperationalError(
+      `La evaluación llevaba más de ${Math.round(limit / 60_000)} min sin terminar (alguna máquina no responde): ` +
+      'se ha cancelado y el modo examen sigue con el ciclo siguiente.'
+    )
+    void cancelRun()
+    return true
+  }
+  // Resultados cargándose: no es un parón.
+  if (processingExit) return false
   const dir = st.project?.dir
   if (!dir) {
     stopMonitor()

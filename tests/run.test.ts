@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { checkMonitorHealth, handleRunEvent, isPartialResume, leaveProject, startMonitor, startRun, stopMonitor } from '../src/renderer/src/lib/run'
+import { cancelRun, checkMonitorHealth, handleRunEvent, isPartialResume, leaveProject, startMonitor, startRun, stopMonitor } from '../src/renderer/src/lib/run'
 import { useApp } from '../src/renderer/src/stores/app'
 import type { LoadedResults, TeutonApi } from '../src/shared/types'
 import { caseReport, loadedResults, resumeCase } from './helpers'
@@ -93,9 +93,50 @@ describe('orquestador de ejecución', () => {
 
   it('el vigilante no interrumpe un ciclo que está corriendo', () => {
     useApp.getState().setMonitor({ active: true, intervalMin: 1, cycles: 1, nextRunAt: Date.now() - 300_000 })
-    useApp.getState().setRun({ status: 'running', runId: 'en-marcha' })
+    useApp.getState().setRun({ status: 'running', runId: 'en-marcha', startedAt: Date.now() - 60_000 })
 
     expect(checkMonitorHealth()).toBe(false)
+  })
+
+  // S-07 (G7): Teutón no pone tiempo máximo a los comandos. Un `ssh` colgado
+  // dejaba la pasada en «running» para siempre y el vigilante no hacía nada.
+  it('el vigilante cancela una pasada colgada del modo examen y programa la siguiente', async () => {
+    const cancelRun = vi.fn().mockResolvedValue(undefined)
+    window.teuton = api({ cancelRun })
+    const now = Date.now()
+    useApp.getState().setMonitor({ active: true, intervalMin: 3, cycles: 2, nextRunAt: null })
+    useApp.getState().setRun({ status: 'running', runId: 'colgada', projectDir: '/tmp/proyecto', startedAt: now - 11 * 60_000 })
+
+    expect(checkMonitorHealth(now)).toBe(true)
+    await vi.waitFor(() => expect(cancelRun).toHaveBeenCalledWith('colgada'))
+    await vi.waitFor(() => expect(useApp.getState().monitor.nextRunAt).not.toBeNull())
+    expect(useApp.getState().monitor.active).toBe(true)
+    expect(useApp.getState().run.status).toBe('idle')
+    expect(useApp.getState().operationalError).toContain('sin terminar')
+  })
+
+  // main emite el `exit` del proceso matado ANTES de que se resuelva la
+  // cancelación: sin anular el runId primero, la pasada cancelada se procesaba.
+  it('cancelar descarta el exit del proceso cancelado', async () => {
+    const loadResults = vi.fn()
+    const cancel = vi.fn(async (runId: string) => {
+      handleRunEvent({ runId, type: 'exit', code: null, testName: 'proyecto', outDir: null, startedAt: 0 })
+    })
+    window.teuton = api({ cancelRun: cancel, loadResults })
+    useApp.getState().setRun({ status: 'running', runId: 'a-cancelar', projectDir: '/tmp/proyecto', startedAt: Date.now() })
+
+    await cancelRun()
+
+    expect(cancel).toHaveBeenCalledWith('a-cancelar')
+    expect(loadResults).not.toHaveBeenCalled()
+    expect(useApp.getState().run.status).toBe('idle')
+  })
+
+  it('startRun anota la hora de arranque de la pasada', async () => {
+    window.teuton = api({ run: vi.fn(async (_d: string, _o: unknown, runId: string) => ({ runId })) })
+    const before = Date.now()
+    await startRun('/tmp/proyecto', { cname: 'start' })
+    expect(useApp.getState().run.startedAt).toBeGreaterThanOrEqual(before)
   })
 
   it('el vigilante para el monitor si ya no hay proyecto abierto', () => {

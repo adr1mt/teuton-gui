@@ -83,3 +83,37 @@ test('abrir otro proyecto con el examen en marcha pide confirmación', async () 
     await session.close()
   }
 })
+
+/**
+ * S-07 (G7). Un `teuton` que nunca termina dejaba el modo examen «evaluando»
+ * para siempre. El reloj de la ventana se simula para no esperar 10 minutos.
+ */
+test('una pasada colgada del modo examen se cancela y llega el ciclo siguiente', async () => {
+  const session = await launchApp({ mode: 'hang' })
+  try {
+    await session.page.clock.install()
+    await session.page.reload()
+    await session.page.waitForSelector('main >> text=Proyectos recientes', { timeout: 20_000 })
+    await openProject(session)
+    await goTo(session, 'Ejecutar')
+    await session.page.click('button:has-text("Iniciar modo examen")')
+    await expect.poll(() => livePids(session), { timeout: 15_000 }).toHaveLength(1)
+    const first = await livePids(session)
+
+    // Con el intervalo por defecto (5 min) el límite es de 15 min.
+    // `fastForward` dispara cada temporizador con la hora a la que vencía: el
+    // segundo salto hace que el vigilante (cada 30 s) ya vea los 16 min.
+    await session.page.clock.fastForward('16:00')
+    await session.page.clock.fastForward('00:31')
+    await expect(session.page.getByText('sin terminar').first()).toBeVisible({ timeout: 15_000 })
+    await expect.poll(() => stillAlive(first), { timeout: 15_000 }).toHaveLength(0)
+
+    // El intervalo por defecto es de 5 min: al vencer arranca otra pasada.
+    await session.page.clock.fastForward('06:00')
+    await expect.poll(() => livePids(session), { timeout: 15_000 }).toHaveLength(1)
+    expect(await livePids(session)).not.toEqual(first)
+    await expect(session.page.locator('text=Modo examen activo').first()).toBeVisible()
+  } finally {
+    await session.close()
+  }
+})

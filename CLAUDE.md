@@ -167,8 +167,12 @@ while still showing "active". Two things guard that invariant: `startRun` **clai
 synchronously** (setting `run.status` before the `await` of `saveDraftsIfDirty`, because two starts in the
 same tick otherwise both passed the guard and the second orphaned the first process), and
 `checkMonitorHealth` — a 30 s watchdog mounted in `useRunManager` — restarts a cycle that never got
-scheduled. The watchdog exists for what code alone can't fix: an `ssh` that hangs and never emits `exit`,
-and a suspended laptop, where the timer doesn't run and the countdown freezes at `0:00`. Leaving the
+scheduled. The watchdog exists for what code alone can't fix: an `ssh` that hangs and never emits `exit`
+(Teutón only times out the SSH *connection*, not the commands), and a suspended laptop, where the timer
+doesn't run and the countdown freezes at `0:00`. A run still `running` after `cycleLimitMs` (10 min or three
+intervals, whichever is longer, measured from `run.startedAt`) is cancelled with a visible notice, and the
+cancellation chains the next cycle. `cancelRun` clears `runId` *before* awaiting main, because main
+broadcasts the killed process's `exit` before the cancel call resolves. Leaving the
 project goes through `leaveProject()` (cancels the child, stops the timer); the store resetting `run` on
 its own only forgot the process, which kept evaluating the previous class and blocked the next run.
 While the monitor is active the app holds a `prevent-display-sleep` power blocker (`keepAwake` IPC): the

@@ -44,7 +44,7 @@ puede cambiar de modo entre pasadas (`setFakeMode`) y sembrar la clase activa.
 | S-04 | **RESOLVED** |
 | S-05 | **RESOLVED** |
 | S-06 | **RESOLVED** |
-| S-07 | pendiente |
+| S-07 | **RESOLVED** |
 | S-08 | pendiente |
 | S-09 | pendiente |
 
@@ -156,6 +156,31 @@ puede cambiar de modo entre pasadas (`setFakeMode`) y sembrar la clase activa.
 - **Verificado:** `npm run typecheck`, `npm test` (174), `npm run build`,
   `npm run test:e2e` (35).
 
+### S-07 — RESOLVED
+
+- **Causa raíz:** `checkMonitorHealth` salía sin hacer nada con
+  `run.status === 'running'`, y Teutón 2.10.6 solo limita la conexión SSH, no
+  los comandos. No había hora de arranque en el estado de la pasada.
+- **Solución:** `run.startedAt` se anota al reservar el turno. Con el modo
+  examen activo, una pasada que lleva más de `cycleLimitMs` (10 min o 3
+  intervalos, lo que sea mayor) se cancela con un aviso («…llevaba más de N
+  min sin terminar…») y la cancelación encadena el ciclo siguiente.
+  `CLAUDE.md` corregido.
+- **Dependencia descubierta:** main emite el `exit` del proceso matado antes
+  de resolver `runCancel`, y `cancelRun` anulaba el `runId` después: la pasada
+  cancelada se procesaba (con S-02 se rechazaba, y su aviso tapaba el de
+  S-07; antes de S-02 se habrían guardado los informes viejos). `cancelRun`
+  anula ahora el `runId` antes de esperar, como ya decía su comentario. Es
+  parte del mismo arreglo; S-16 (cancelación que no mata) sigue abierto.
+- **Tests:** `run.test.ts` «el vigilante cancela una pasada colgada…»,
+  «startRun anota la hora de arranque», «cancelar descarta el exit del proceso
+  cancelado»; E2E `modo-examen.spec.ts` «una pasada colgada del modo examen se
+  cancela y llega el ciclo siguiente» (modo `hang`, reloj simulado de
+  Playwright en la ventana: +16 min → aviso y proceso muerto; +6 min → otro
+  proceso).
+- **Verificado:** `npm run typecheck`, `npm test` (177), `npm run build`,
+  `npm run test:e2e` (36); el E2E nuevo ×3 sin fallos.
+
 ## Findings consolidados
 
 Los ID de origen enlazan al detalle (escenario, camino, test y arreglo).
@@ -175,7 +200,7 @@ Los ID de origen enlazan al detalle (escenario, camino, test y arreglo).
 | S-04 | A1-04 | **RESOLVED.** Con `tt_testname`/`tt_outdir` y un `var/<carpeta>` viejo, cada ciclo lee la pasada vieja. |
 | S-05 | A1-05 | **RESOLVED.** Historial ilegible → el CSV automático se reescribe con las notas de la última pasada, no con las mejores. |
 | S-06 | A2-01 | **RESOLVED.** Si `.teuton-gui-meta.json` no se puede escribir, no se guarda ninguna nota en todo el examen; el aviso es genérico. |
-| S-07 | A3-01 | Un `teuton` colgado detiene el modo examen para siempre; el vigilante no actúa con `running`. `CLAUDE.md` afirma lo contrario. |
+| S-07 | A3-01 | **RESOLVED.** Un `teuton` colgado detiene el modo examen para siempre; el vigilante no actúa con `running`. `CLAUDE.md` afirma lo contrario. |
 | S-08 | A5-01 | Restaurar una copia para una clase resucita las notas de práctica de otra clase ya reiniciada. |
 | S-09 | A5-02 | Restaurar con el historial sin permisos de lectura baja notas y dice «Notas restauradas». |
 
