@@ -42,7 +42,10 @@ export function studentRows(results: LoadedResults, passScore = 50): StudentRow[
   const resumeCases: ResumeCase[] | null = results.resume?.cases ?? null
 
   if (resumeCases) {
-    return resumeCases.map((rc) => {
+    // Las filas `skip` (id «-») son alumnos que esta pasada no evaluó: con
+    // `--case` Teutón escribe una por cada alumno no elegido. No son alumnos
+    // con un 0.
+    return resumeCases.filter((rc) => !rc.skip).map((rc) => {
       const c = byId.get(rc.id)
       const counts = countTargets(c)
       return {

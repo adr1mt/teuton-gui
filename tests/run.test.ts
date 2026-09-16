@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { checkMonitorHealth, handleRunEvent, leaveProject, startMonitor, startRun, stopMonitor } from '../src/renderer/src/lib/run'
+import { checkMonitorHealth, handleRunEvent, isPartialResume, leaveProject, startMonitor, startRun, stopMonitor } from '../src/renderer/src/lib/run'
 import { useApp } from '../src/renderer/src/stores/app'
 import type { LoadedResults, TeutonApi } from '../src/shared/types'
 import { caseReport, loadedResults, resumeCase } from './helpers'
@@ -142,7 +142,7 @@ describe('orquestador de ejecución', () => {
  * Procesa el `exit` de una pasada del grupo B con los informes que devuelva
  * `loadResults` y espera a que termine `loadAfterExit`.
  */
-async function finishRun(code: number | null, loaded: LoadedResults, startedAt: number): Promise<TeutonApi> {
+async function finishRun(code: number | null, loaded: LoadedResults, startedAt: number, partial = false): Promise<TeutonApi> {
   const teuton = api({
     loadResults: vi.fn().mockResolvedValue(loaded),
     setProjectMeta: vi.fn().mockResolvedValue(undefined),
@@ -152,7 +152,7 @@ async function finishRun(code: number | null, loaded: LoadedResults, startedAt: 
   })
   window.teuton = teuton
   useApp.getState().setActiveClass('Grupo B', 'clase-b')
-  useApp.getState().setRun({ status: 'running', runId: 'r1', projectDir: '/tmp/proyecto', classId: 'clase-b', className: 'Grupo B' })
+  useApp.getState().setRun({ status: 'running', runId: 'r1', projectDir: '/tmp/proyecto', classId: 'clase-b', className: 'Grupo B', partial })
   handleRunEvent({ runId: 'r1', type: 'exit', code, testName: 'proyecto', startedAt })
   await vi.waitFor(() => expect(useApp.getState().loadingResults).toBe(false))
   await new Promise((resolve) => setTimeout(resolve, 0))
@@ -232,5 +232,59 @@ describe('procedencia de los informes (S-02)', () => {
     // START lleva 500 ms; ext3/FAT truncan el mtime al segundo.
     const teuton = await finishRun(0, grupoA(START - 500), START)
     expect(teuton.updateRecords).toHaveBeenCalled()
+  })
+})
+
+describe('reevaluación parcial (S-01)', () => {
+  const START = Date.UTC(2026, 8, 16, 11, 0, 0, 0)
+
+  beforeEach(() => {
+    vi.useRealTimers()
+    useApp.getState().closeProject()
+    useApp.getState().setProject({
+      dir: '/tmp/proyecto', cname: 'start', script: '', config: '---\ncases: []\n', scriptFile: 'start.rb', configFile: 'config.yaml'
+    })
+  })
+
+  function reevaluacion(): LoadedResults {
+    const res = loadedResults({
+      resumeCases: [
+        resumeCase('-', '-', 0, { skip: true, moodleId: undefined }),
+        resumeCase('02', 'Luis', 100, { moodleId: 'a2' }),
+        resumeCase('-', '-', 0, { skip: true, moodleId: undefined })
+      ],
+      cases: [caseReport('02', 'Luis', 100, [{ id: '01', check: true }])]
+    })
+    res.generatedAt = START + 2000
+    res.cases[0].generatedAt = START + 1000
+    return res
+  }
+
+  it('guarda la nota del reevaluado pero no reescribe el CSV de la clase', async () => {
+    const teuton = await finishRun(0, reevaluacion(), START, true)
+    expect(teuton.updateRecords).toHaveBeenCalledWith('/tmp/proyecto', { Luis: 100 }, 'clase-b')
+    expect(teuton.writeClassCsv).not.toHaveBeenCalled()
+    expect(useApp.getState().results?.partial).toBe(true)
+    expect(useApp.getState().operationalError).toContain('parcial')
+  })
+
+  it('startRun congela si la pasada es parcial', async () => {
+    const run = vi.fn(async (_d: string, _o: unknown, runId: string) => ({ runId }))
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: { teuton: api({ run }) } })
+    await startRun('/tmp/proyecto', { cname: 'start', cases: [2] })
+    expect(useApp.getState().run.partial).toBe(true)
+  })
+})
+
+describe('isPartialResume (recargar de disco)', () => {
+  const skip = resumeCase('-', '-', 0, { skip: true })
+  const res = loadedResults({ resumeCases: [skip, resumeCase('02', 'Luis', 100)] })
+
+  it('una fila skip sin tt_skip en el config es de --case', () => {
+    expect(isPartialResume(res, '---\ncases:\n- tt_members: Ana\n- tt_members: Luis\n')).toBe(true)
+  })
+
+  it('una fila skip de un alumno con tt_skip: true no hace parcial la pasada', () => {
+    expect(isPartialResume(res, '---\ncases:\n- tt_members: Ana\n  tt_skip: true\n- tt_members: Luis\n')).toBe(false)
   })
 })

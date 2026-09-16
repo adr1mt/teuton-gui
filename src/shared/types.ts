@@ -121,6 +121,8 @@ export interface LoadedResults {
   /** Clase que produjo estos resultados; viaja con el dato, no con la vista activa. */
   classId?: string | null
   className?: string | null
+  /** Pasada de solo algunos alumnos (`--case`): no representa a la clase entera. */
+  partial?: boolean
   resume: ResumeReport | null
   cases: CaseReport[]
   moodleCsv: string | null

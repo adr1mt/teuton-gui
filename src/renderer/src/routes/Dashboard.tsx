@@ -137,7 +137,8 @@ export default function Dashboard() {
   const resultClassId = results?.classId === undefined ? activeClassId : results.classId
   const resultClassName = results?.className === undefined ? activeClass : results.className
   const classMismatch = results?.classId !== undefined && results.classId !== activeClassId
-  const exportBlocked = staleResults || classMismatch || identityIssues.length > 0
+  const partialResults = results?.partial === true
+  const exportBlocked = staleResults || classMismatch || partialResults || identityIssues.length > 0
 
   const selectStudent = useCallback((r: StudentRow) => setSelectedId(r.id), [])
 
@@ -485,6 +486,11 @@ export default function Dashboard() {
         {classMismatch && (
           <Banner tone="warning" icon={<AlertTriangle className="h-4 w-4 shrink-0" />}>
             Estos resultados pertenecen a «{resultClassName || 'ejecución manual'}», no a la clase activa. Vuelve a ejecutar antes de exportar.
+          </Banner>
+        )}
+        {partialResults && (
+          <Banner tone="warning" icon={<AlertTriangle className="h-4 w-4 shrink-0" />}>
+            Resultados de una reevaluación parcial: solo aparecen los alumnos reevaluados. Ejecuta la clase completa antes de exportar.
           </Banner>
         )}
         {staleResults && (

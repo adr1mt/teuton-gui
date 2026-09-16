@@ -38,7 +38,7 @@ puede cambiar de modo entre pasadas (`setFakeMode`) y sembrar la clase activa.
 
 | ID | Estado |
 |---|---|
-| S-01 | pendiente |
+| S-01 | **RESOLVED** |
 | S-02 | **RESOLVED** |
 | S-03 | **RESOLVED** |
 | S-04 | pendiente |
@@ -89,6 +89,28 @@ puede cambiar de modo entre pasadas (`setFakeMode`) y sembrar la clase activa.
 - **Verificado:** `npm run typecheck`, `npm test` (160), `npm run build`,
   `npm run test:e2e` (30).
 
+### S-01 — RESOLVED
+
+- **Causa raíz:** con `--case`, Teutón 2.10.6 escribe una fila `skip` (id
+  «-») por cada alumno no elegido. `studentRows` las trataba como alumnos con
+  0, y `loadAfterExit` reescribía el CSV de la clase con los pocos alumnos
+  reevaluados. El teuton falso escribía solo el caso elegido y lo ocultaba.
+- **Solución:** `studentRows` descarta las filas `skip`. La pasada congela
+  `partial` al arrancar (`options.cases`); una pasada parcial guarda la nota en
+  el historial pero **no** reescribe el CSV automático y lo dice. El panel
+  bloquea la exportación manual mientras muestra resultados parciales (con
+  aviso), y al recargar de disco `isPartialResume` distingue `--case` de un
+  `tt_skip: true` del config.
+- **Tests:** `partial.test.ts` (fixtures reales `case2` y `full`: vista, KPI,
+  «Requieren atención», récords, CSV); `run.test.ts` «reevaluación parcial
+  (S-01)» e «isPartialResume»; E2E `reevaluar-csv.spec.ts` (antes del arreglo
+  el CSV quedaba con la cabecera y un alumno).
+- **Riesgo residual:** si la última acción del examen es una reevaluación, el
+  CSV automático conserva la nota anterior de ese alumno hasta la siguiente
+  pasada completa (nunca la baja ni quita a nadie). El aviso lo dice.
+- **Verificado:** `npm run typecheck`, `npm test` (166), `npm run build`,
+  `npm run test:e2e` (31).
+
 ## Findings consolidados
 
 Los ID de origen enlazan al detalle (escenario, camino, test y arreglo).
@@ -97,7 +119,7 @@ Los ID de origen enlazan al detalle (escenario, camino, test y arreglo).
 
 | ID | Origen | Qué pasa |
 |---|---|---|
-| S-01 | A1-01 | **Reevaluar a un alumno reescribe el CSV de Moodle de la clase con un solo alumno.** Con Teutón real, `--case` deja 14 filas `"-"` que además salen en pantalla como alumnos con 0 (media, aprobados y «Requieren atención» falsos). El teuton falso no imita este formato. |
+| S-01 | A1-01 | **RESOLVED.** **Reevaluar a un alumno reescribe el CSV de Moodle de la clase con un solo alumno.** Con Teutón real, `--case` deja 14 filas `"-"` que además salen en pantalla como alumnos con 0 (media, aprobados y «Requieren atención» falsos). El teuton falso no imita este formato. |
 | S-02 | A1-02 (+ A2 «exit ≠ 0») | **RESOLVED.** **Una pasada que no escribe informes se procesa como nueva.** Exit 1 (error de sintaxis) o exit 0 (sin `play`) dejan los informes anteriores, que pueden ser de otra clase: sus notas entran en el historial de la clase actual y su CSV se escribe con los alumnos de la otra. Incluye el caso «casos nuevos + resumen viejo». |
 
 ### High

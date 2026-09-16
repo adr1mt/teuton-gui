@@ -64,6 +64,7 @@ export async function startRun(dir: string, options: RunOptions): Promise<void> 
     run: {
       status: 'running', log: '', runId, testName: null,
       projectDir: dir, classId: st.activeClassId, className: st.activeClass,
+      partial: (options.cases?.length ?? 0) > 0,
       expectedTotal: null,
       // Cada ejecución (incluido cada ciclo de modo examen) arranca el contador
       // de progreso desde cero, con el escáner incremental reiniciado.
@@ -144,10 +145,11 @@ export function caseIndexFor(row: StudentRow, configDraft: string): number | nul
 
 /**
  * Reevalúa a UN solo alumno (p.ej. corrigió algo durante el examen y pide que
- * se le vuelva a mirar). Tras la ejecución, resume.json contiene solo su caso,
- * así que el dashboard muestra temporalmente solo a ese alumno — igual que la
- * selección manual de casos en Ejecutar. Los récords conservan a todos y el
- * siguiente ciclo completo (o modo examen) restaura la vista de la clase.
+ * se le vuelva a mirar). Tras la ejecución, resume.json lleva al resto como
+ * filas `skip`, así que el dashboard muestra temporalmente solo a ese alumno —
+ * igual que la selección manual de casos en Ejecutar. Los récords conservan a
+ * todos, el CSV de la clase no se toca, y el siguiente ciclo completo (o modo
+ * examen) restaura la vista de la clase.
  */
 export async function reevaluateStudent(row: StudentRow): Promise<void> {
   const st = useApp.getState()
@@ -224,7 +226,10 @@ export async function reloadLatestResults(): Promise<LoadedResults | null> {
     const runClassName =
       meta.lastRunClassName === undefined ? useApp.getState().activeClass : meta.lastRunClassName
     const loaded = await window.teuton.loadResults(project.dir)
-    const res = { ...loaded, classId: runClassId, className: runClassName }
+    const res = {
+      ...loaded, classId: runClassId, className: runClassName,
+      partial: isPartialResume(loaded, useApp.getState().configDraft)
+    }
     useApp.getState().setResults(res)
     const { grades, issues } = gradeRecordsFromResults(res)
     if (issues.length > 0) {
@@ -381,7 +386,8 @@ export function handleRunEvent(ev: RunEvent): void {
     const context = {
       projectDir: st.run.projectDir,
       classId: st.run.classId,
-      className: st.run.className
+      className: st.run.className,
+      partial: st.run.partial
     }
     st.setRun({
       status: ev.code === 0 ? 'done' : 'failed',
@@ -390,6 +396,16 @@ export function handleRunEvent(ev: RunEvent): void {
     })
     void loadAfterExit(ev.code, ev.testName, ev.startedAt, context)
   }
+}
+
+/**
+ * ¿Es un resume.json de `--case`? Sus filas `skip` no corresponden a un
+ * `tt_skip: true` del config (Teutón escribe las filas en el orden del config).
+ * Solo se usa al recargar de disco, donde no se sabe cómo se lanzó la pasada.
+ */
+export function isPartialResume(res: LoadedResults, configDraft: string): boolean {
+  const cases = parseConfig(configDraft).config.cases
+  return (res.resume?.cases ?? []).some((rc, i) => rc.skip && cases[i]?.tt_skip !== true)
 }
 
 /**
@@ -421,7 +437,7 @@ async function loadAfterExit(
   code: number | null,
   testName: string | null,
   startedAt: number,
-  context: { projectDir: string | null; classId: string | null; className: string | null }
+  context: { projectDir: string | null; classId: string | null; className: string | null; partial: boolean }
 ): Promise<void> {
   if (!context.projectDir) return
   processingExit = true
@@ -432,7 +448,7 @@ async function loadAfterExit(
   if (isCurrentContext()) useApp.getState().setLoadingResults(true)
   try {
     const loaded = await window.teuton.loadResults(context.projectDir, testName ?? undefined)
-    const res = { ...loaded, classId: context.classId, className: context.className }
+    const res = { ...loaded, classId: context.classId, className: context.className, partial: context.partial }
     if (!isFreshRun(res, code, startedAt)) {
       useApp.getState().setOperationalError(
         `La evaluación no ha producido informes nuevos${code === 0 ? '' : ` (código ${code ?? 'sin código'})`}: ` +
@@ -473,7 +489,14 @@ async function loadAfterExit(
     // (informes/moodle-<clase>.csv). Un fichero por clase: al pasar el mismo
     // examen a otro grupo se crea otro CSV y ambos coexisten como historial.
     const exportIssues = validateResultIdentity(res)
-    if ((res.resume?.cases.length ?? 0) > 0 && exportIssues.length === 0) {
+    if (context.partial) {
+      // Una reevaluación solo trae a unos pocos alumnos: reescribir el CSV con
+      // ellos dejaba al resto de la clase fuera del fichero que se sube a Moodle.
+      useApp.getState().setOperationalError(
+        'Ha sido una reevaluación parcial: la nota se ha guardado en el historial, pero el CSV de la clase ' +
+        'no se ha reescrito. Se actualizará en la próxima pasada completa.'
+      )
+    } else if ((res.resume?.cases.length ?? 0) > 0 && exportIssues.length === 0) {
       const csvName = context.className || res.testName || 'clase'
       try {
         await window.teuton.writeClassCsv(
