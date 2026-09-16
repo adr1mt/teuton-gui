@@ -6,8 +6,8 @@ clase aparecen una vez y no se pueden reproducir a voluntad: una máquina que no
 responde, dos ciclos que se pisan, un informe a medio escribir.
 
 ```bash
-npm run test:e2e          # los 25 escenarios sobre la app real
-npm test                  # 138 tests unitarios
+npm run test:e2e          # los 36 escenarios sobre la app real
+npm test                  # 180 tests unitarios
 npm run verify:parsing -- <proyecto ya ejecutado>
 ```
 
@@ -18,7 +18,15 @@ npm run verify:parsing -- <proyecto ya ejecutado>
   fallo (`FAKE_TEUTON_MODE`): `hang` (no termina nunca), `crash` (muere a
   mitad), `truncate` (informe válido + cola de otro proceso), `noresume`,
   `huge` (40 MB por stdout), `slow`, `notargets`, `badgrades`, `offline`
-  (el primer alumno con la máquina apagada).
+  (el primer alumno con la máquina apagada), `noreports` (sale con 0 sin
+  escribir: `start.rb` sin `play`), `syntaxerror` (sale con 1 sin tocar
+  `var/`), `emptyresume` (`cases: []` y los informes anteriores intactos) y
+  `staleresume` (casos nuevos, resumen viejo). `FAKE_TEUTON_MODEFILE` permite
+  cambiar de modo entre pasadas (`setFakeMode` en el harness).
+- **Es fiel a Teutón 2.10.6**: con `--case` escribe las filas `skip` del real,
+  respeta `tt_testname` y `tt_outdir` como el real, y nunca borra `var/`.
+  `tests/fake-teuton.test.ts` lo compara con los informes reales de
+  `tests/fixtures/teuton-2.10.6/`.
 - **`tests/e2e/harness.ts`** arranca la app de verdad con Playwright, cada
   escenario con su propio `userData` temporal y su proyecto temporal. **La UAT
   nunca toca las clases, los ajustes ni los proyectos reales del profesor.**
@@ -55,6 +63,13 @@ npm run verify:parsing -- <proyecto ya ejecutado>
 | 23 | «¿Todo listo?» con un alumno sin nombre | Bloquea: sin nombre su nota no se puede guardar ni exportar |
 | 24 | Un alumno con la máquina apagada | Su columna de la matriz sale como «máquina no responde», no como un examen todo en rojo |
 | 25 | Modo proyector encendido | La interfaz pasa a 20px de raíz y ni la IP ni la contraseña quedan visibles (tabla, consola ni orden ejecutada) |
+| 26-29 | Grupo A bien y luego grupo B con `crash`, `noreports`, `syntaxerror` o `staleresume` | «No ha producido informes nuevos»; ni historial, ni CSV, ni meta del grupo B (S-02) |
+| 30 | Vaciar la tabla (`emptyresume`) y «Cargar últimos resultados» | Los alumnos del grupo anterior no entran en el historial del nuevo (S-03) |
+| 31-32 | `tt_testname` o `tt_outdir` añadidos con un `var/` antiguo | La pasada nueva se lee de donde la escribe Teutón (S-04) |
+| 33 | Reevaluar a un alumno con el formato real de `--case` | El CSV de la clase no cambia, no hay filas «-» y la exportación queda bloqueada (S-01) |
+| 34 | `.teuton-gui-meta.json` con `chmod 000` | Las notas se guardan igual (S-06) |
+| 35 | Historial con `chmod 000` y una pasada peor | El CSV conserva las mejores notas (S-05) |
+| 36 | `teuton` colgado en modo examen (reloj simulado) | A los 15 min se cancela con aviso y llega el ciclo siguiente (S-07) |
 
 El 17 deja un Electron bloqueado en un diálogo nativo que hay que matar a lo
 bruto. Un SIGKILL al proceso principal **no** se lleva a sus hijos: quedaban
@@ -66,13 +81,24 @@ esta no se cerraba nunca y la suite terminaba con «Worker teardown timeout of
 `--user-data-dir`, que es único por sesión, y el `teuton` por los ficheros de
 pid. La suite pasó de 2,2 min a 38 s y no deja nada vivo.
 
-Y en los tests unitarios: `classes.json` sin permisos de lectura (las clases no
+Y en los tests unitarios: restaurar una copia para una clase sin tocar otra
+reiniciada y sin sustituir un historial que no se puede leer (S-08, S-09),
+`classes.json` sin permisos de lectura (las clases no
 pueden desaparecer ni sobreescribirse), 300 alumnos, dos guardados a la vez,
 historial de notas dañado, informe que es un array, y claves de alumno que solo
 se diferencian en espacios.
 
 ## Lo que encontró
 
+- **Dos pasadas en el mismo segundo** (escenarios 26-29): la primera versión de
+  la guarda de frescura redondeaba al segundo y aceptaba el resumen de la
+  pasada anterior. Ahora compara exacto (salvo en sistemas de ficheros de
+  segundos).
+- **Cancelar procesaba el `exit` del proceso cancelado** (escenario 36): main lo
+  emite antes de resolver la cancelación. `cancelRun` anula el turno antes.
+- **Con `tt_outdir`, Teutón real sale con 1** si `var/<tt_testname>` no existe.
+- **Carrera del propio test 11**: leía `informes/` cuando solo existía el
+  temporal `.tmp` del guardado atómico.
 - **Dos arranques en el mismo tick dejaban un proceso huérfano.** Guardar los
   borradores cede el control antes de marcar el estado como «ejecutando», así
   que dos llamadas seguidas pasaban las dos el guardián; la segunda pisaba el

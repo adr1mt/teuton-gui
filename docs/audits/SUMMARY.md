@@ -89,6 +89,17 @@ puede cambiar de modo entre pasadas (`setFakeMode`) y sembrar la clase activa.
 - **Verificado:** `npm run typecheck`, `npm test` (160), `npm run build`,
   `npm run test:e2e` (30).
 
+**Gate de la fase (2026-09-16):** `npm run typecheck`, `npm test` (180),
+`npm run build`, `npm run test:e2e` (36), `npm run verify:parsing` sobre un
+proyecto ejecutado con Teutón 2.10.6 (completo y `--case=2`; la aserción de
+filas cuenta ahora solo casos no saltados), `./scripts/instalar.sh --forzar` y
+escenario 15 (`empaquetada.spec.ts`) sobre ese build. Todo en verde. Quedan
+los puntos 2, 7 y 8 del gate de examen (ver `docs/HANDOFF.md`).
+
+Orden seguido: infraestructura → S-02 → S-03 → S-01 → S-04 → S-05/S-06 →
+S-07 → S-08 → S-09. Sin cambios de orden respecto al pedido; S-04 se apoya en
+la guarda de S-02 y S-07 obligó a corregir el orden de `cancelRun`.
+
 ### S-01 — RESOLVED
 
 - **Causa raíz:** con `--case`, Teutón 2.10.6 escribe una fila `skip` (id

@@ -42,7 +42,11 @@ async function main() {
   assert(results.moodleCsv !== null, 'moodle.csv leído')
 
   const rows = studentRows(results)
-  assert(rows.length === (results.resume?.cases.length ?? 0), 'filas de alumno = casos del resumen')
+  // Con `--case`, Teutón escribe filas `skip` para los no evaluados: no son alumnos.
+  const evaluated = results.resume?.cases.filter((c) => !c.skip) ?? []
+  assert(rows.length === evaluated.length, 'filas de alumno = casos no saltados del resumen')
+  assert(rows.every((r) => r.members !== '-'), 'ninguna fila «-» como alumno')
+  assert(evaluated.every((c) => results.cases.some((k) => k.caseId === c.id)), 'cada caso evaluado tiene su case-NN.json')
   const first = rows[0]
   console.log('--- primera fila ---', JSON.stringify(first, (k, v) => (k === 'caseReport' ? '[…]' : v)))
   assert(first.total === first.passed + first.failed, 'passed + failed = total')
