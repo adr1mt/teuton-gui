@@ -85,8 +85,15 @@ interface AppState {
    * aterrizar en Resultados ya filtrado, no en la clase entera.
    */
   attentionOnly: boolean
-  /** Último fallo operativo que requiere atención del usuario. */
-  operationalError: string | null
+  /**
+   * Avisos operativos en pantalla (S-14). Con un solo hueco, el aviso de un
+   * ciclo tapaba el «no se han guardado las notas» del anterior. Los errores
+   * se quedan hasta que el profesor los cierra; los `info` se sustituyen entre
+   * sí. El mismo mensaje repetido suma `count` en vez de apilarse.
+   */
+  notices: Notice[]
+  /** Errores antiguos apartados por el límite de la lista. */
+  droppedNotices: number
   /**
    * Modo proyector: todo un 25 % más grande y los datos de máquina tapados.
    * Vive en el store (no en una vista) porque afecta a la app entera.
@@ -116,9 +123,22 @@ interface AppState {
   setMonitor: (patch: Partial<MonitorState>) => void
   setActiveClass: (name: string | null, id?: string | null) => void
   setAttentionOnly: (v: boolean) => void
-  setOperationalError: (message: string | null) => void
+  /** `null` cierra todos los avisos. */
+  setOperationalError: (message: string | null, options?: { info?: boolean }) => void
+  dismissNotice: (id: number) => void
   toggleProjector: () => void
 }
+
+export interface Notice {
+  id: number
+  message: string
+  info: boolean
+  count: number
+}
+
+// Bastan para no perder nada en un examen; más taparían el panel proyectado.
+const MAX_NOTICES = 5
+let nextNoticeId = 1
 
 const savedTheme: Theme = localStorage.getItem('teuton-theme') === 'light' ? 'light' : 'dark'
 const savedProjector = localStorage.getItem('teuton-proyector') === '1'
@@ -177,7 +197,8 @@ export const useApp = create<AppState>((set, get) => ({
   activeClass: null,
   activeClassId: null,
   attentionOnly: false,
-  operationalError: null,
+  notices: [],
+  droppedNotices: 0,
   projector: savedProjector,
 
   setTheme: (theme) => {
@@ -207,7 +228,8 @@ export const useApp = create<AppState>((set, get) => ({
       activeClass: null,
       activeClassId: null,
       attentionOnly: false,
-      operationalError: null
+      // Un error de notas sin leer sobrevive al cambio de proyecto (S-14).
+      notices: get().notices.filter((n) => !n.info)
     }),
   closeProject: () =>
     set({
@@ -223,7 +245,7 @@ export const useApp = create<AppState>((set, get) => ({
       activeClass: null,
       activeClassId: null,
       attentionOnly: false,
-      operationalError: null,
+      notices: get().notices.filter((n) => !n.info),
       view: 'home'
     }),
   setScriptDraft: (v) => set({ scriptDraft: v, dirty: true }),
@@ -274,7 +296,23 @@ export const useApp = create<AppState>((set, get) => ({
   setActiveClass: (activeClass, activeClassId = null) =>
     set((s) => (s.activeClassId === activeClassId ? { activeClass } : { activeClass, activeClassId, stalls: {} })),
   setAttentionOnly: (attentionOnly) => set({ attentionOnly }),
-  setOperationalError: (operationalError) => set({ operationalError }),
+  setOperationalError: (message, options) => {
+    if (message === null) return set({ notices: [], droppedNotices: 0 })
+    const info = options?.info === true
+    const notices = get().notices
+    const same = notices.find((n) => n.message === message)
+    if (same) {
+      return set({ notices: notices.map((n) => (n === same ? { ...n, count: n.count + 1 } : n)) })
+    }
+    const kept = info ? notices.filter((n) => !n.info) : notices
+    const next = [...kept, { id: nextNoticeId++, message, info, count: 1 }]
+    const dropped = Math.max(0, next.length - MAX_NOTICES)
+    set({ notices: next.slice(dropped), droppedNotices: get().droppedNotices + dropped })
+  },
+  dismissNotice: (id) => {
+    const notices = get().notices.filter((n) => n.id !== id)
+    set({ notices, droppedNotices: notices.length === 0 ? 0 : get().droppedNotices })
+  },
   toggleProjector: () => {
     const next = !get().projector
     localStorage.setItem('teuton-proyector', next ? '1' : '0')

@@ -264,6 +264,12 @@ when the project's own records file is unparseable — that is precisely the cas
 dashboard offers it in the «…» menu *and* in the empty state, because a teacher who lost the project folder
 lands on the empty view.
 
+**Notices don't overwrite each other** (`notices` in `stores/app.ts`). One slot meant the next cycle's
+notice erased «no se han guardado las notas» before anyone read it. Errors stay until dismissed one by one;
+`setOperationalError(msg, { info: true })` marks the informative ones (partial re-evaluation, watchdog),
+which only replace each other. A repeated message bumps a counter instead of stacking, the list is capped
+at 5, and switching project keeps the errors.
+
 **Credential store status surfaced in Settings** (`getCredentialsStatus`). When the desktop keyring is down,
 `getDefaultGlobals` returns `usuario`/`usuario` with the real credentials still encrypted on disk. That used
 to live only in a `console.error`, so the teacher saw plausible-looking defaults in the table and no hint

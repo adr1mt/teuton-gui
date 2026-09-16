@@ -354,7 +354,8 @@ export function checkMonitorHealth(now = Date.now()): boolean {
     if (st.run.startedAt === null || now - st.run.startedAt <= limit) return false
     st.setOperationalError(
       `La evaluación llevaba más de ${Math.round(limit / 60_000)} min sin terminar (alguna máquina no responde): ` +
-      'se ha cancelado y el modo examen sigue con el ciclo siguiente.'
+      'se ha cancelado y el modo examen sigue con el ciclo siguiente.',
+      { info: true }
     )
     void cancelRun()
     return true
@@ -369,7 +370,7 @@ export function checkMonitorHealth(now = Date.now()): boolean {
   }
   const overdue = st.monitor.nextRunAt !== null && st.monitor.nextRunAt < now - WATCHDOG_GRACE_MS
   if (monitorTimer !== null && !overdue) return false
-  st.setOperationalError('El modo examen se había quedado parado; se reanuda ahora.')
+  st.setOperationalError('El modo examen se había quedado parado; se reanuda ahora.', { info: true })
   clearMonitorTimer()
   runCycle(dir)
   return true
@@ -538,7 +539,8 @@ async function loadAfterExit(
       // ellos dejaba al resto de la clase fuera del fichero que se sube a Moodle.
       useApp.getState().setOperationalError(
         'Ha sido una reevaluación parcial: la nota se ha guardado en el historial, pero el CSV de la clase ' +
-        'no se ha reescrito. Se actualizará en la próxima pasada completa.'
+        'no se ha reescrito. Se actualizará en la próxima pasada completa.',
+        { info: true }
       )
     } else if ((res.resume?.cases.length ?? 0) > 0 && exportIssues.length === 0) {
       const csvName = context.className || res.testName || 'clase'

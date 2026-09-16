@@ -19,6 +19,7 @@ function api(overrides: Partial<TeutonApi> = {}): TeutonApi {
 describe('orquestador de ejecución', () => {
   beforeEach(() => {
     vi.useRealTimers()
+    useApp.getState().setOperationalError(null)
     useApp.getState().closeProject()
     useApp.getState().setProject({
       dir: '/tmp/proyecto', cname: 'start', script: '', config: '---\ncases: []\n', scriptFile: 'start.rb', configFile: 'config.yaml'
@@ -49,7 +50,7 @@ describe('orquestador de ejecución', () => {
     expect(useApp.getState().run.status).toBe('failed')
     expect(useApp.getState().run.runId).toBeNull()
     expect(useApp.getState().monitor.nextRunAt).not.toBeNull()
-    expect(useApp.getState().operationalError).toContain('spawn EACCES')
+    expect(useApp.getState().notices.at(-1)?.message).toContain('spawn EACCES')
   })
 
   it('ceder el turno a una ejecución en vuelo no mata el modo examen', async () => {
@@ -88,7 +89,7 @@ describe('orquestador de ejecución', () => {
     expect(checkMonitorHealth()).toBe(true)
     await vi.waitFor(() => expect(run).toHaveBeenCalledTimes(1))
     expect(useApp.getState().monitor.cycles).toBe(4)
-    expect(useApp.getState().operationalError).toContain('parado')
+    expect(useApp.getState().notices.at(-1)?.message).toContain('parado')
   })
 
   it('el vigilante no interrumpe un ciclo que está corriendo', () => {
@@ -112,7 +113,7 @@ describe('orquestador de ejecución', () => {
     await vi.waitFor(() => expect(useApp.getState().monitor.nextRunAt).not.toBeNull())
     expect(useApp.getState().monitor.active).toBe(true)
     expect(useApp.getState().run.status).toBe('idle')
-    expect(useApp.getState().operationalError).toContain('sin terminar')
+    expect(useApp.getState().notices.at(-1)?.message).toContain('sin terminar')
   })
 
   // main emite el `exit` del proceso matado ANTES de que se resuelva la
@@ -141,12 +142,13 @@ describe('orquestador de ejecución', () => {
 
   it('el vigilante para el monitor si ya no hay proyecto abierto', () => {
     useApp.getState().setMonitor({ active: true, intervalMin: 1, cycles: 1, nextRunAt: null })
+    useApp.getState().setOperationalError(null)
     useApp.getState().closeProject()
     useApp.getState().setMonitor({ active: true, intervalMin: 1, cycles: 1, nextRunAt: null })
 
     expect(checkMonitorHealth()).toBe(true)
     expect(useApp.getState().monitor.active).toBe(false)
-    expect(useApp.getState().operationalError).toContain('proyecto')
+    expect(useApp.getState().notices.at(-1)?.message).toContain('proyecto')
   })
 
   it('el modo examen impide que el ordenador se suspenda, y lo suelta al parar', () => {
@@ -218,6 +220,7 @@ describe('procedencia de los informes (S-02)', () => {
 
   beforeEach(() => {
     vi.useRealTimers()
+    useApp.getState().setOperationalError(null)
     useApp.getState().closeProject()
     useApp.getState().setProject({
       dir: '/tmp/proyecto', cname: 'start', script: '', config: '---\ncases: []\n', scriptFile: 'start.rb', configFile: 'config.yaml'
@@ -230,7 +233,7 @@ describe('procedencia de los informes (S-02)', () => {
     expect(teuton.updateRecords).not.toHaveBeenCalled()
     expect(teuton.writeClassCsv).not.toHaveBeenCalled()
     expect(teuton.setProjectMeta).not.toHaveBeenCalled()
-    expect(useApp.getState().operationalError).toContain('no ha producido informes nuevos')
+    expect(useApp.getState().notices.at(-1)?.message).toContain('no ha producido informes nuevos')
   })
 
   it('G3: una pasada con código 0 que no escribió nada tampoco', async () => {
@@ -239,7 +242,7 @@ describe('procedencia de los informes (S-02)', () => {
     expect(teuton.writeClassCsv).not.toHaveBeenCalled()
     expect(teuton.setProjectMeta).not.toHaveBeenCalled()
     expect(useApp.getState().results).toBeNull()
-    expect(useApp.getState().operationalError).toContain('no ha producido informes nuevos')
+    expect(useApp.getState().notices.at(-1)?.message).toContain('no ha producido informes nuevos')
   })
 
   it('G3: sin resume.json no hay pasada que procesar', async () => {
@@ -248,7 +251,7 @@ describe('procedencia de los informes (S-02)', () => {
     res.generatedAt = null
     const teuton = await finishRun(0, res, START)
     expect(teuton.updateRecords).not.toHaveBeenCalled()
-    expect(useApp.getState().operationalError).toContain('no ha producido informes nuevos')
+    expect(useApp.getState().notices.at(-1)?.message).toContain('no ha producido informes nuevos')
   })
 
   it('G5: un caso de otra pasada junto a un resumen nuevo no se procesa', async () => {
@@ -284,6 +287,7 @@ describe('reevaluación parcial (S-01)', () => {
 
   beforeEach(() => {
     vi.useRealTimers()
+    useApp.getState().setOperationalError(null)
     useApp.getState().closeProject()
     useApp.getState().setProject({
       dir: '/tmp/proyecto', cname: 'start', script: '', config: '---\ncases: []\n', scriptFile: 'start.rb', configFile: 'config.yaml'
@@ -309,7 +313,7 @@ describe('reevaluación parcial (S-01)', () => {
     expect(teuton.updateRecords).toHaveBeenCalledWith('/tmp/proyecto', { Luis: 100 }, 'clase-b')
     expect(teuton.writeClassCsv).not.toHaveBeenCalled()
     expect(useApp.getState().results?.partial).toBe(true)
-    expect(useApp.getState().operationalError).toContain('parcial')
+    expect(useApp.getState().notices.at(-1)?.message).toContain('parcial')
   })
 
   it('startRun congela si la pasada es parcial', async () => {
@@ -347,6 +351,7 @@ describe('orden de guardado al terminar (S-05, S-06)', () => {
 
   beforeEach(() => {
     vi.useRealTimers()
+    useApp.getState().setOperationalError(null)
     useApp.getState().closeProject()
     useApp.getState().setProject({
       dir: '/tmp/proyecto', cname: 'start', script: '', config: '---\ncases: []\n', scriptFile: 'start.rb', configFile: 'config.yaml'
@@ -359,7 +364,7 @@ describe('orden de guardado al terminar (S-05, S-06)', () => {
     })
     expect(teuton.updateRecords).toHaveBeenCalledWith('/tmp/proyecto', { Ana: 0 }, 'clase-b')
     expect(teuton.writeClassCsv).toHaveBeenCalled()
-    expect(useApp.getState().operationalError).toContain('EACCES')
+    expect(useApp.getState().notices.at(-1)?.message).toContain('EACCES')
   })
 
   it('G8: con el historial ilegible no se reescribe el CSV con las notas de esta pasada', async () => {
@@ -369,7 +374,7 @@ describe('orden de guardado al terminar (S-05, S-06)', () => {
     })
     expect(teuton.writeClassCsv).not.toHaveBeenCalled()
     expect(useApp.getState().records).toEqual({ Ana: 100 })
-    expect(useApp.getState().operationalError).toContain('notas')
-    expect(useApp.getState().operationalError).toContain('CSV')
+    expect(useApp.getState().notices.at(-1)?.message).toContain('notas')
+    expect(useApp.getState().notices.at(-1)?.message).toContain('CSV')
   })
 })

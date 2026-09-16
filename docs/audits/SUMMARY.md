@@ -94,7 +94,7 @@ puede cambiar de modo entre pasadas (`setFakeMode`) y sembrar la clase activa.
 | ID | Estado |
 |---|---|
 | S-11 | **RESOLVED** |
-| S-14 | Pendiente |
+| S-14 | **RESOLVED** |
 | S-17 | Pendiente |
 | S-21 | Pendiente |
 
@@ -115,6 +115,28 @@ puede cambiar de modo entre pasadas (`setFakeMode`) y sembrar la clase activa.
   un 0 guardado, historial, lista de sin evaluar); E2E `maquina-apagada.spec.ts`
   «no llega al CSV como un 0» (antes: 5 filas con Ana en 0.00).
 - **Verificado:** `npm run typecheck`, `npm test` (185), `npm run build`,
+  `npm run test:e2e` (37).
+
+### S-14 — RESOLVED
+
+- **Causa raíz:** el store tenía un solo hueco (`operationalError`) y cada
+  `setOperationalError` lo sustituía. El «no se han guardado las notas» de un
+  ciclo lo tapaba el aviso del siguiente; cambiar de proyecto también lo
+  borraba.
+- **Solución:** `notices` en el store (`stores/app.ts`), con la misma llamada
+  `setOperationalError`. Los errores se quedan hasta que el profesor cierra
+  cada uno. Los avisos informativos (`{ info: true }`: reevaluación parcial,
+  vigilante que reanuda o cancela un ciclo) se sustituyen entre sí y nunca a un
+  error. El mismo mensaje repetido suma «(×N)» en vez de apilarse: sin
+  avalancha en modo examen. Máximo 5 en pantalla; si se apartan más antiguos,
+  una línea lo dice. Cambiar de proyecto conserva los errores y quita los
+  informativos.
+- **Tests:** `notices.test.ts` (7: error + informativo, error + error,
+  informativos, repetición ×20, límite, cerrar uno, cambio de proyecto);
+  `run.test.ts` lee el último aviso de la lista.
+- **Riesgo residual:** con más de 5 errores distintos sin cerrar, los más
+  antiguos se apartan; queda la línea «Y N avisos anteriores».
+- **Verificado:** `npm run typecheck`, `npm test` (192), `npm run build`,
   `npm run test:e2e` (37).
 
 **Gate de la fase Critical/High (2026-09-16):** `npm run typecheck`, `npm test` (180),
@@ -279,7 +301,7 @@ Los ID de origen enlazan al detalle (escenario, camino, test y arreglo).
 | S-11 | A1-07 | **RESOLVED.** Alumno con la máquina apagada todo el examen → `0.00` en el CSV sin marca. |
 | S-12 | A1-08 | «Cargar últimos resultados» puede atribuir la pasada a la clase anterior si `loadAfterExit` falló. |
 | S-13 | A2-02 | La copia de seguridad que falla solo queda en el log. |
-| S-14 | A2-03 | Un aviso de error se sustituye por el siguiente; los de «notas no guardadas» se pierden. |
+| S-14 | A2-03 | **RESOLVED.** Un aviso de error se sustituye por el siguiente; los de «notas no guardadas» se pierden. |
 | S-15 | A2-04 | Escala de notas inválida o ilegible → 70/10 sin aviso (o con uno que se cierra) para todos los CSV. |
 | S-16 | A3-02 | Cancelación no confirmada: el renderer queda en «parado» y main sigue bloqueado; el resultado tardío se descarta. |
 | S-17 | A3-03 | Cerrar la ventana entre ciclos del modo examen no pide confirmación (y puede cortar el guardado del último ciclo). |

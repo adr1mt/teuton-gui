@@ -63,7 +63,9 @@ function AppBody() {
   const setGrading = useApp((s) => s.setGrading)
   const setDefaultGlobals = useApp((s) => s.setDefaultGlobals)
   const runStatus = useApp((s) => s.run.status)
-  const operationalError = useApp((s) => s.operationalError)
+  const notices = useApp((s) => s.notices)
+  const droppedNotices = useApp((s) => s.droppedNotices)
+  const dismissNotice = useApp((s) => s.dismissNotice)
   const setOperationalError = useApp((s) => s.setOperationalError)
 
   useRunManager()
@@ -211,18 +213,35 @@ function AppBody() {
           las pantallas, incluida la que se proyecta durante el examen. El
           crédito vive en Ajustes → Acerca de. */}
       <main className="flex flex-1 flex-col overflow-hidden bg-background">
-        {operationalError && (
-          <div role="alert" className="flex shrink-0 items-start gap-2 border-b border-destructive/30 bg-destructive/10 px-4 py-2 text-sm text-destructive-strong">
+        {notices.map((notice) => (
+          <div
+            key={notice.id}
+            role={notice.info ? 'status' : 'alert'}
+            className={cn(
+              'flex shrink-0 items-start gap-2 border-b px-4 py-2 text-sm',
+              notice.info
+                ? 'border-border bg-muted text-foreground'
+                : 'border-destructive/30 bg-destructive/10 text-destructive-strong'
+            )}
+          >
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-            <span className="min-w-0 flex-1">{operationalError}</span>
+            <span className="min-w-0 flex-1">
+              {notice.message}
+              {notice.count > 1 && <span className="ml-1 font-semibold">(×{notice.count})</span>}
+            </span>
             <button
               type="button"
-              onClick={() => setOperationalError(null)}
+              onClick={() => dismissNotice(notice.id)}
               className="rounded p-0.5 hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label="Cerrar aviso"
             >
               <X className="h-4 w-4" />
             </button>
+          </div>
+        ))}
+        {droppedNotices > 0 && (
+          <div className="shrink-0 border-b border-destructive/30 bg-destructive/10 px-4 py-1 text-xs text-destructive-strong">
+            Y {droppedNotices} aviso(s) anterior(es) que ya no caben; revisa el historial y el CSV.
           </div>
         )}
         <div key={view} className="min-h-0 flex-1 animate-fade-in">
