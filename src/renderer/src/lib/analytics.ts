@@ -36,10 +36,12 @@ export function studentRows(results: LoadedResults, passScore = 50): StudentRow[
     return { passed, failed, total: passed + failed }
   }
 
-  // Preferimos el resumen (incluye estado y errores de conexión); si no, usamos casos.
+  // Preferimos el resumen (incluye estado y errores de conexión); los casos
+  // sueltos solo cuando NO hay resume.json. Un resumen con cero casos es una
+  // pasada sin alumnos, no una invitación a leer los informes que queden.
   const resumeCases: ResumeCase[] | null = results.resume?.cases ?? null
 
-  if (resumeCases && resumeCases.length > 0) {
+  if (resumeCases) {
     return resumeCases.map((rc) => {
       const c = byId.get(rc.id)
       const counts = countTargets(c)

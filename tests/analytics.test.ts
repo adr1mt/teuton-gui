@@ -257,3 +257,11 @@ describe('robustez de la distribución de notas', () => {
     expect(dist[9].count).toBe(2) // 100 y 150
   })
 })
+
+describe('studentRows con un resumen sin casos (S-03)', () => {
+  it('cero casos en resume.json son cero alumnos, aunque lleguen informes sueltos', () => {
+    const res = loadedResults({ resumeCases: [], cases: [caseReport('01', 'Ana', 100, [{ id: '01', check: true }])] })
+    expect(studentRows(res)).toEqual([])
+  })
+})
+

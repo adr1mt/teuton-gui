@@ -239,8 +239,10 @@ export async function loadResults(dir: string, testName?: string): Promise<Loade
   // Teutón sobrescribe los case-NN de la ejecución actual pero NO borra los de
   // ejecuciones anteriores con más casos (p.ej. al pasar de 4 alumnos a 1 tras
   // importar otra clase). Filtramos por los casos que declara el resume actual
-  // para no mezclar alumnos de distintas clases/ejecuciones.
-  if (resume && resume.cases.length > 0) {
+  // para no mezclar alumnos de distintas clases/ejecuciones. Un resume sin
+  // casos también filtra: Teutón lo escribe así con `cases: []` y deja los
+  // case-NN.json de la clase anterior, que no son alumnos de esta pasada.
+  if (resume) {
     const validIds = new Set(resume.cases.map((c) => c.id))
     caseFiles = caseFiles.filter((f) => {
       const id = f.match(/^case-(\w+)\.json$/)?.[1]

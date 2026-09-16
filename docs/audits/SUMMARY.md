@@ -40,7 +40,7 @@ puede cambiar de modo entre pasadas (`setFakeMode`) y sembrar la clase activa.
 |---|---|
 | S-01 | pendiente |
 | S-02 | **RESOLVED** |
-| S-03 | pendiente |
+| S-03 | **RESOLVED** |
 | S-04 | pendiente |
 | S-05 | pendiente |
 | S-06 | pendiente |
@@ -72,6 +72,23 @@ puede cambiar de modo entre pasadas (`setFakeMode`) y sembrar la clase activa.
 - **Verificado:** `npm run typecheck`, `npm test` (158), `npm run build`,
   `npm run test:e2e` (29); `procedencia.spec.ts` ×8 sin fallos.
 
+### S-03 — RESOLVED
+
+- **Causa raíz:** `loadResults` solo filtraba los `case-NN.json` por el
+  resumen si este tenía casos, y `studentRows` pasaba a la rama «sin resumen»
+  con `cases: []`. Teutón 2.10.6 escribe justo eso al vaciar la tabla y deja
+  los informes del grupo anterior.
+- **Solución:** el filtro se aplica siempre que exista `resume.json`, y
+  `studentRows` usa el resumen aunque esté vacío. Con S-02 la pasada ya se
+  rechazaba (casos anteriores al arranque); el hueco seguía abierto por
+  «Cargar últimos resultados».
+- **Tests:** `results.test.ts` «un resume.json sin casos no resucita…» (con el
+  fixture real `emptycases`); `analytics.test.ts` «studentRows con un resumen
+  sin casos»; E2E `procedencia.spec.ts` «…no resucita a los del grupo anterior
+  (S-03)» (antes del arreglo el historial de B recibía los 4 alumnos de A).
+- **Verificado:** `npm run typecheck`, `npm test` (160), `npm run build`,
+  `npm run test:e2e` (30).
+
 ## Findings consolidados
 
 Los ID de origen enlazan al detalle (escenario, camino, test y arreglo).
@@ -87,7 +104,7 @@ Los ID de origen enlazan al detalle (escenario, camino, test y arreglo).
 
 | ID | Origen | Qué pasa |
 |---|---|---|
-| S-03 | A1-03 | `resume.json` con `cases: []` desactiva el filtro: los `case-NN.json` viejos entran como alumnos actuales en el historial. |
+| S-03 | A1-03 | **RESOLVED.** `resume.json` con `cases: []` desactiva el filtro: los `case-NN.json` viejos entran como alumnos actuales en el historial. |
 | S-04 | A1-04 | Con `tt_testname`/`tt_outdir` y un `var/<carpeta>` viejo, cada ciclo lee la pasada vieja. |
 | S-05 | A1-05 | Historial ilegible → el CSV automático se reescribe con las notas de la última pasada, no con las mejores. |
 | S-06 | A2-01 | Si `.teuton-gui-meta.json` no se puede escribir, no se guarda ninguna nota en todo el examen; el aviso es genérico. |

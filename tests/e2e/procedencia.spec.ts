@@ -52,3 +52,34 @@ for (const mode of ['crash', 'noreports', 'syntaxerror', 'staleresume']) {
     }
   })
 }
+
+/**
+ * Vaciar la tabla y ejecutar deja un resume.json nuevo con `cases: []` y los
+ * case-NN.json del grupo anterior (Teutón 2.10.6). «Recargar resultados» los
+ * volcaba como alumnos del grupo actual en su historial.
+ */
+test('un resumen sin alumnos no resucita a los del grupo anterior (S-03)', async () => {
+  const session = await launchApp({ meta: GRUPO_A })
+  const recordsFile = join(session.projectDir, '.teuton-gui-records.json')
+  try {
+    await openProject(session)
+    await runOnce(session, GRUPO_A.activeClass)
+    await expect.poll(() => fs.readFile(recordsFile, 'utf-8').catch(() => ''), { timeout: 15_000 })
+      .toContain(GRUPO_A.activeClassId)
+
+    await fs.writeFile(join(session.projectDir, '.teuton-gui-meta.json'), JSON.stringify(GRUPO_B))
+    await setFakeMode(session, 'emptyresume')
+    await reopenProject(session)
+    await runOnce(session, GRUPO_B.activeClass)
+    await goTo(session, 'Resultados')
+    // Vista vacía (la pasada no tiene alumnos) o con resultados: los dos botones recargan.
+    await session.page.locator('main button:has-text("Cargar últimos resultados"), main button[aria-label="Recargar resultados"]').first().click()
+    await session.page.waitForTimeout(1500)
+
+    const records = JSON.parse(await fs.readFile(recordsFile, 'utf-8'))
+    expect(Object.keys(records.classes?.[`class:${GRUPO_B.activeClassId}`] ?? {})).toEqual([])
+    await expect(session.page.locator('main').getByText('Ana Ferrer')).toHaveCount(0)
+  } finally {
+    await session.close()
+  }
+})

@@ -216,4 +216,21 @@ describe('informes hostiles', () => {
     expect(res.warnings.join(' ')).toContain('case-01.json')
     expect(res.warnings.join(' ')).toContain('resume.json')
   })
+
+  // G4 (S-03): Teutón con `cases: []` escribe un resume.json nuevo y deja los
+  // case-NN.json de la clase anterior. Cero casos es «cero alumnos», no «sin filtro».
+  it('un resume.json sin casos no resucita los case-NN.json anteriores', async () => {
+    dir = await makeProjectDir()
+    const real = join('tests', 'fixtures', 'teuton-2.10.6')
+    const out = join(dir, 'var', 'proj')
+    await fs.mkdir(out, { recursive: true })
+    for (const f of ['case-01.json', 'case-02.json', 'case-03.json']) {
+      await fs.copyFile(join(real, 'full', f), join(out, f))
+    }
+    await fs.copyFile(join(real, 'emptycases', 'resume.json'), join(out, 'resume.json'))
+
+    const res = await loadResults(dir, 'proj')
+    expect(res.resume?.cases).toEqual([])
+    expect(res.cases).toEqual([])
+  })
 })
