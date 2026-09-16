@@ -21,17 +21,18 @@ Dejar la app lista para un examen real según el gate de
   `./scripts/instalar.sh --forzar` y escenario 15 con ese build.
 
 - Medium del gate: S-11 RESOLVED (máquina sin conexión = «sin evaluar», no 0),
-  S-14 RESOLVED (lista de avisos; los errores no se pisan).
+  S-14 RESOLVED (lista de avisos; los errores no se pisan),
+  S-17 RESOLVED (la X pregunta con el modo examen activo).
 
 ## In progress
 
-Medium del gate: S-17, S-21 (en ese orden). Sin aceptar como riesgo.
+Medium del gate: S-21. Sin aceptar como riesgo.
 
 ## Next
 
 Puntos 2, 7 y 8 del gate de `SUMMARY.md`:
 
-1. Corregir S-17 y S-21 (test que falla → arreglo → suite → doc).
+1. Corregir S-21 (test que falla → arreglo → suite → doc).
 2. Ensayo de aula: 30 min de modo examen con máquinas reales, reevaluando a un
    alumno a mitad, y revisar a mano el CSV de `informes/` contra el panel.
    Tras una reevaluación el CSV no se reescribe hasta la siguiente pasada

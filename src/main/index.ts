@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, session, shell } from 'electron'
 import { join } from 'node:path'
-import { hasActiveRuns, registerIpc, releaseKeepAwake, stopActiveRuns } from './ipc'
+import { hasActiveRuns, isExamModeActive, registerIpc, releaseKeepAwake, stopActiveRuns } from './ipc'
 
 // Evita cuelgues de compositor/GPU habituales en Linux (causa típica de
 // "la ventana no responde"). La app es ligera y no necesita aceleración HW.
@@ -77,7 +77,11 @@ function createWindow(): void {
   // aparezca incluso si la interfaz se ha quedado atascada.
   let closeConfirmed = false
   win.on('close', (event) => {
-    if (closeConfirmed || !hasActiveRuns()) return
+    if (quitRequested) return
+    // El modo examen cuenta aunque no haya proceso: entre dos ciclos no lo hay
+    // durante casi todo el intervalo (S-17).
+    const running = hasActiveRuns()
+    if (closeConfirmed || (!running && !isExamModeActive())) return
     event.preventDefault()
     const choice = dialog.showMessageBoxSync(win, {
       type: 'warning',
@@ -85,7 +89,7 @@ function createWindow(): void {
       defaultId: 0,
       cancelId: 0,
       title: 'Hay una corrección en marcha',
-      message: 'Hay una evaluación en curso.',
+      message: running ? 'Hay una evaluación en curso.' : 'El modo examen está activo.',
       detail: 'Si cierras ahora se detendrá la corrección de la clase. Las notas ya guardadas se conservan.'
     })
     if (choice === 1) {
@@ -118,6 +122,11 @@ function createWindow(): void {
   }
 }
 
+// Salida pedida a la aplicación, no a la ventana: cierre de sesión, `kill` o
+// Ctrl+Q. Electron atiende SIGTERM por su cuenta con 'before-quit' y cierra las
+// ventanas; un diálogo ahí dejaba el apagado colgado con el modo examen activo.
+let quitRequested = false
+
 app.whenReady().then(() => {
   registerCsp()
   registerIpc()
@@ -135,6 +144,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
+  quitRequested = true
   stopActiveRuns()
   releaseKeepAwake()
 })
@@ -143,6 +153,7 @@ app.on('before-quit', () => {
 // sin esto los `teuton`/`ssh` lanzados quedan vivos tras apagar el ordenador.
 for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP'] as const) {
   process.on(signal, () => {
+    quitRequested = true
     stopActiveRuns()
     releaseKeepAwake()
     app.quit()

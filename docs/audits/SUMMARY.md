@@ -95,7 +95,7 @@ puede cambiar de modo entre pasadas (`setFakeMode`) y sembrar la clase activa.
 |---|---|
 | S-11 | **RESOLVED** |
 | S-14 | **RESOLVED** |
-| S-17 | Pendiente |
+| S-17 | **RESOLVED** |
 | S-21 | Pendiente |
 
 ### S-11 — RESOLVED
@@ -138,6 +138,32 @@ puede cambiar de modo entre pasadas (`setFakeMode`) y sembrar la clase activa.
   antiguos se apartan; queda la línea «Y N avisos anteriores».
 - **Verificado:** `npm run typecheck`, `npm test` (192), `npm run build`,
   `npm run test:e2e` (37).
+
+### S-17 — RESOLVED
+
+- **Causa raíz:** el `close` de la ventana solo preguntaba si había un proceso
+  vivo (`hasActiveRuns`). Entre dos ciclos del modo examen no lo hay durante
+  casi todo el intervalo, así que la X cerraba la app sin aviso.
+- **Solución:** el renderer ya llama a `keepAwake(true/false)` justo al iniciar
+  y detener el modo examen; main guarda ese estado (`isExamModeActive`, aparte
+  del bloqueador de suspensión) y `close` pregunta también con él («El modo
+  examen está activo»). Sin IPC nuevo. Al depurar la prueba apareció que
+  Electron atiende SIGTERM (cierre de sesión) emitiendo `before-quit` y
+  cerrando las ventanas, sin llegar al manejador de Node: con el modo examen
+  activo el diálogo habría dejado el apagado colgado. Por eso una salida por
+  `before-quit` no pregunta (`quitRequested`).
+- **Tests:** E2E `cierre.spec.ts` «entre ciclos del modo examen no cierra sin
+  preguntar» (antes: la app salía con código 0), «con el modo examen detenido
+  cierra» y «cerrar la sesión con el modo examen activo no se queda colgado».
+- **Dependencias:** no toca S-16 ni S-26/S-27.
+- **Riesgo residual:** Ctrl+Q (menú oculto de Electron) sale sin preguntar,
+  porque no se distingue de un cierre de sesión. Fuera del modo examen, cerrar
+  en los milisegundos en que se guardan las notas de una pasada manual sigue
+  sin preguntar. El comentario de `main/index.ts` sobre las señales dice que
+  SIGTERM no dispara `before-quit`; con Electron actual sí lo dispara (el
+  manejador sigue como red de seguridad).
+- **Verificado:** `npm run typecheck`, `npm test` (192), `npm run build`,
+  `npm run test:e2e` (40).
 
 **Gate de la fase Critical/High (2026-09-16):** `npm run typecheck`, `npm test` (180),
 `npm run build`, `npm run test:e2e` (36), `npm run verify:parsing` sobre un
@@ -304,7 +330,7 @@ Los ID de origen enlazan al detalle (escenario, camino, test y arreglo).
 | S-14 | A2-03 | **RESOLVED.** Un aviso de error se sustituye por el siguiente; los de «notas no guardadas» se pierden. |
 | S-15 | A2-04 | Escala de notas inválida o ilegible → 70/10 sin aviso (o con uno que se cierra) para todos los CSV. |
 | S-16 | A3-02 | Cancelación no confirmada: el renderer queda en «parado» y main sigue bloqueado; el resultado tardío se descarta. |
-| S-17 | A3-03 | Cerrar la ventana entre ciclos del modo examen no pide confirmación (y puede cortar el guardado del último ciclo). |
+| S-17 | A3-03 | **RESOLVED.** Cerrar la ventana entre ciclos del modo examen no pide confirmación (y puede cortar el guardado del último ciclo). |
 | S-18 | A5-03 | `config.yaml` y `start.rb` se guardan sin `fsync`. |
 | S-19 | A5-04 | Las copias no aparecen si la carpeta del examen se ha movido o renombrado. |
 | S-20 | A5-05 | Renombrar a un alumno deja su mejor nota fuera del CSV (clave = nombre). |

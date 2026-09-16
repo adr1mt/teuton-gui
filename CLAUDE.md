@@ -178,7 +178,10 @@ its own only forgot the process, which kept evaluating the previous class and bl
 While the monitor is active the app holds a `prevent-display-sleep` power blocker (`keepAwake` IPC): the
 teacher doesn't touch the keyboard during an exam, so the desktop counts the machine as idle and suspends
 it — GNOME defaults to 2 h on AC, exactly the length of an exam — and the screen is being projected, which
-is why it's display-sleep and not just app-suspension. Every exit path releases it (`releaseKeepAwake`).
+is why it's display-sleep and not just app-suspension. Every exit path releases it (`releaseKeepAwake`). Main also reads that same call as «exam mode is on»
+(`isExamModeActive`): the window's `close` asks for confirmation with it even when no process is alive,
+because between two cycles there is none. A quit through `before-quit` (logout — Electron handles SIGTERM
+that way —, `kill`, Ctrl+Q) never asks: a dialog there hung the desktop shutdown.
 
 **Live progress bar** (`lib/progress.ts`). Teutón doesn't report machine-readable progress. It prints one
 character per check to stdout between the `Started at` and `Finished in` lines: `.` (pass), `F` (fail), `S`

@@ -263,6 +263,15 @@ function trackChild(child: ChildProcess): void {
  * que impedir que la pantalla se apague: está proyectada.
  */
 let keepAwakeId: number | null = null
+// El renderer llama a `keepAwake` justo al iniciar y al detener el modo examen,
+// así que es también el aviso de que está activo. Se guarda aparte del
+// bloqueador: si este fallara, el cierre tiene que seguir preguntando (S-17).
+let examModeActive = false
+
+/** Modo examen activo: entre ciclos no hay proceso, pero cerrar lo detiene. */
+export function isExamModeActive(): boolean {
+  return examModeActive
+}
 
 function setKeepAwake(active: boolean): void {
   if (active) {
@@ -439,6 +448,7 @@ export function registerIpc(): void {
 
   handle(IPC.keepAwake, (_e, active) => {
     if (typeof active !== 'boolean') throw new Error('El valor de mantener despierto no es válido.')
+    examModeActive = active
     setKeepAwake(active)
   })
 

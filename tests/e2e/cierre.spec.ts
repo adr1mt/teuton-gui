@@ -67,3 +67,68 @@ test('cerrar la sesión del escritorio no deja procesos vivos', async () => {
   }
   await expect.poll(() => stillAlive(launched), { timeout: 15_000 }).toHaveLength(0)
 })
+
+/**
+ * S-17 (G28). Entre dos ciclos del modo examen no hay ningún `teuton` vivo, y
+ * cerrar la ventana en esos minutos detenía la corrección sin preguntar.
+ */
+test('cerrar la ventana entre ciclos del modo examen no cierra sin preguntar', async () => {
+  const session = await launchApp()
+  const proceso = session.app.process()
+  try {
+    await openProject(session)
+    await goTo(session, 'Ejecutar')
+    await session.page.waitForSelector('button:has-text("Iniciar modo examen")')
+    await session.page.click('button:has-text("Iniciar modo examen")')
+
+    // Primer ciclo terminado y el siguiente solo programado: ningún proceso.
+    await expect(session.page.getByText('Próxima evaluación en').first()).toBeVisible({ timeout: 40_000 })
+    await expect(runningBadge(session)).toHaveCount(0)
+    expect(await livePids(session)).toHaveLength(0)
+
+    void session.app
+      .evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close())
+      .catch(() => undefined)
+    await new Promise((resolve) => setTimeout(resolve, 5000))
+    expect(proceso.exitCode).toBeNull()
+  } finally {
+    await session.kill()
+  }
+})
+
+test('con el modo examen detenido, cerrar la ventana cierra la app', async () => {
+  const session = await launchApp()
+  const proceso = session.app.process()
+  try {
+    await openProject(session)
+    await goTo(session, 'Ejecutar')
+    await session.page.click('button:has-text("Iniciar modo examen")')
+    await expect(session.page.getByText('Próxima evaluación en').first()).toBeVisible({ timeout: 40_000 })
+    await session.page.locator('button:has-text("Detener")').first().click()
+    await expect(session.page.getByText('Modo examen activo')).toHaveCount(0)
+
+    void session.app
+      .evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.close())
+      .catch(() => undefined)
+    await expect.poll(() => proceso.exitCode, { timeout: 20_000 }).not.toBeNull()
+  } finally {
+    await session.kill()
+  }
+})
+
+test('cerrar la sesión del escritorio con el modo examen activo no se queda colgado', async () => {
+  const session = await launchApp()
+  const proceso = session.app.process()
+  try {
+    await openProject(session)
+    await goTo(session, 'Ejecutar')
+    await session.page.click('button:has-text("Iniciar modo examen")')
+    await expect(session.page.getByText('Próxima evaluación en').first()).toBeVisible({ timeout: 40_000 })
+
+    // El escritorio no espera a un diálogo: la app tiene que terminar sola.
+    proceso.kill('SIGTERM')
+    await expect.poll(() => proceso.exitCode ?? proceso.signalCode, { timeout: 20_000 }).not.toBeNull()
+  } finally {
+    await session.kill()
+  }
+})
