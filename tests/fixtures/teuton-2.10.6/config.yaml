@@ -1,0 +1,9 @@
+---
+global:
+cases:
+- tt_members: Ana
+  tt_moodle_id: '101'
+- tt_members: Luis
+  tt_moodle_id: '102'
+- tt_members: Eva
+  tt_moodle_id: '103'

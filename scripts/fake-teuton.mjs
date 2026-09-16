@@ -21,6 +21,17 @@
  *   notargets  `check` sin fila Targets (la barra de progreso se queda sin total)
  *   badgrades  notas negativas, no finitas y por encima de 100 en resume.json
  *   offline    el primer alumno tiene la máquina apagada (conn_status con error)
+ *   noreports  sale con 0 sin escribir nada (start.rb sin bloque `play`)
+ *   syntaxerror sale con 1 sin tocar var/ (start.rb con error de sintaxis)
+ *   emptyresume escribe resume.json con `cases: []` y deja los case-NN.json
+ *              anteriores (config.yaml sin casos)
+ *   staleresume reescribe los case-NN.json con otra nota y muere antes del
+ *              resume.json, que queda el de la pasada anterior
+ *
+ * Fiel a Teutón 2.10.6 (ver tests/fixtures/teuton-2.10.6/README.md): nunca
+ * borra var/; con `--case` el resume.json lleva TODAS las filas y las no
+ * elegidas salen como `skip` con id «-»; respeta `tt_testname` y `tt_outdir`
+ * (este último solo para resume.json y moodle.csv, como el real).
  *
  * FAKE_TEUTON_VERSION cambia la versión que anuncia; vacía = no imprime versión
  * (para probar el rechazo de un binario que no es Teutón).
@@ -86,6 +97,24 @@ function readCases() {
     }
   }
   return cases
+}
+
+/** Valor de una clave de `global:` (tt_testname, tt_outdir), o null. */
+function readGlobal(key) {
+  const file = ['config.yaml', 'config.yml'].map((n) => join(cwd, n)).find((p) => existsSync(p))
+  if (!file) return null
+  let inGlobal = false
+  for (const line of readFileSync(file, 'utf-8').split('\n')) {
+    if (/^:?global:/.test(line)) {
+      inGlobal = true
+      continue
+    }
+    if (/^[^\s#]/.test(line)) inGlobal = false
+    if (!inGlobal) continue
+    const match = line.match(new RegExp(`^\\s+:?${key}:\\s*(.*)$`))
+    if (match) return match[1].trim().replace(/^['"]|['"]$/g, '') || null
+  }
+  return null
 }
 
 const TARGETS_PER_CASE = 4
@@ -162,7 +191,14 @@ async function main() {
   const selected = (args.find((a) => a.startsWith('--case=')) || '').replace('--case=', '')
   const only = selected ? selected.split(',').map((n) => parseInt(n, 10)) : null
   const all = readCases()
-  const chosen = only ? all.filter((_, i) => only.includes(i + 1)) : all
+
+  // Sin bloque `play` el real no imprime nada ni escribe nada, y sale con 0.
+  if (mode === 'noreports') return 0
+  // Un error de sintaxis en start.rb revienta antes de tocar var/.
+  if (mode === 'syntaxerror') {
+    process.stderr.write("start.rb:1: syntax error, unexpected end-of-input (SyntaxError)\n")
+    return 1
+  }
 
   process.stdout.write(`Started at ${new Date().toISOString()}\n`)
 
@@ -175,13 +211,32 @@ async function main() {
     await new Promise(() => keepAlive)
   }
 
-  const outDir = join(cwd, 'var', testName)
+  const realTestName = readGlobal('tt_testname') || testName
+  const outDir = join(cwd, 'var', realTestName)
+  const resumeDir = readGlobal('tt_outdir') ? join(cwd, readGlobal('tt_outdir')) : outDir
   mkdirSync(outDir, { recursive: true })
+  mkdirSync(resumeDir, { recursive: true })
+
+  if (mode === 'emptyresume') {
+    process.stdout.write(`\nFinished in 0.01 seconds\n`)
+    writeResume(resumeDir, realTestName, [])
+    return 0
+  }
 
   const resumeCases = []
-  for (const [index, entry] of chosen.entries()) {
-    const globalIndex = only ? only[index] - 1 : index
-    const grade = gradeFor(entry, globalIndex)
+  let written = 0
+  for (const [globalIndex, entry] of all.entries()) {
+    if (only && !only.includes(globalIndex + 1)) {
+      // Así escribe Teutón 2.10.6 los casos no elegidos con --case, y no toca
+      // su case-NN.json.
+      resumeCases.push({
+        skip: true, id: '-', grade: 0.0, letter: 'S', members: '-',
+        conn_status: {}, moodle_id: '', moodle_feedback: ''
+      })
+      continue
+    }
+    const index = written++
+    const grade = mode === 'staleresume' ? gradeFor(entry, globalIndex + 1) : gradeFor(entry, globalIndex)
     const passed = Math.round((Math.max(0, Math.min(100, grade)) / 100) * TARGETS_PER_CASE)
     for (let t = 0; t < TARGETS_PER_CASE; t++) {
       process.stdout.write(t < passed ? '.' : 'F')
@@ -201,12 +256,13 @@ async function main() {
       members: entry.members,
       // Máquina apagada: Teutón llena conn_status y el alumno falla TODOS los
       // objetivos sin haberlo intentado.
-      conn_status: mode === 'offline' && index === 0 ? { host1: 'Connection refused' } : {},
+      conn_status: mode === 'offline' && globalIndex === 0 ? { host1: 'Connection refused' } : {},
       moodle_id: entry.moodleId || 'NODATA',
       moodle_feedback: `"Filename: case-${id}."`
     })
 
-    if (mode === 'crash' && index === Math.floor(chosen.length / 2)) {
+    const chosenCount = only ? all.filter((_, i) => only.includes(i + 1)).length : all.length
+    if (mode === 'crash' && index === Math.floor(chosenCount / 2)) {
       process.stderr.write('fake-teuton: fallo simulado a mitad de la ejecución\n')
       return 1
     }
@@ -215,22 +271,30 @@ async function main() {
   process.stdout.write(`\nFinished in 1.23 seconds\n`)
 
   if (mode === 'noresume') return 0
+  if (mode === 'staleresume') {
+    process.stderr.write('fake-teuton: muerto antes de escribir resume.json\n')
+    return 137
+  }
 
+  writeResume(resumeDir, realTestName, resumeCases)
+  return 0
+}
+
+function writeResume(dir, name, resumeCases) {
   writeFileSync(
-    join(outDir, 'resume.json'),
+    join(dir, 'resume.json'),
     JSON.stringify({
-      config: { tt_testname: testName, tt_title: 'fake-teuton' },
+      config: { tt_testname: name, tt_title: 'fake-teuton' },
       cases: resumeCases,
       results: {}
     })
   )
   writeFileSync(
-    join(outDir, 'moodle.csv'),
+    join(dir, 'moodle.csv'),
     ['MoodleID, TeutonGrade, TeutonFeedback']
-      .concat(resumeCases.map((c) => `${c.moodle_id},${c.grade},"case-${c.id}"`))
+      .concat(resumeCases.filter((c) => !c.skip).map((c) => `${c.moodle_id},${c.grade},"case-${c.id}"`))
       .join('\n') + '\n'
   )
-  return 0
 }
 
 main().then(
