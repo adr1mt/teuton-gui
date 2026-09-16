@@ -15,7 +15,10 @@ vi.mock('electron', () => ({
   }
 }))
 
-import { deleteClass, getProjectMeta, getRecords, listClasses, saveClass, setProjectMeta, updateRecords } from '../src/main/store'
+import {
+  deleteClass, getProjectMeta, getRecords, listClasses, listRecordBackups, resetRecords, restoreRecordBackup,
+  saveClass, setProjectMeta, updateRecords
+} from '../src/main/store'
 import { validatedMeta } from '../src/main/validation'
 
 const temporary: string[] = []
@@ -159,3 +162,40 @@ describe('las clases guardadas no pueden desaparecer', () => {
     expect(list.find((c) => c.id === 'grande')!.students).toHaveLength(300)
   })
 })
+
+describe('restaurar notas de una copia (S-08)', () => {
+  async function project(): Promise<string> {
+    runtime.userData = await fs.mkdtemp(join(tmpdir(), 'teuton-userdata-'))
+    const dir = await fs.mkdtemp(join(tmpdir(), 'teuton-restore-'))
+    temporary.push(dir, runtime.userData)
+    return dir
+  }
+
+  // G16: la copia de la hora tiene a las dos clases. Restaurar para A no puede
+  // devolver a B las notas de práctica que el profesor acaba de borrar.
+  it('restaurar para una clase no resucita las notas reiniciadas de otra', async () => {
+    const dir = await project()
+    await updateRecords(dir, { Ana: 90 }, 'clase-a')
+    await updateRecords(dir, { Pau: 80 }, 'clase-b')
+    await resetRecords(dir, 'clase-b')
+    const [copia] = await listRecordBackups(dir)
+
+    const outcome = await restoreRecordBackup(dir, copia.id, 'clase-a')
+
+    expect(outcome.data).toEqual({ Ana: 90 })
+    expect(await getRecords(dir, 'clase-b')).toEqual({})
+    expect(await getRecords(dir, 'clase-a')).toEqual({ Ana: 90 })
+  })
+
+  it('con el historial dañado sí restaura la copia', async () => {
+    const dir = await project()
+    await updateRecords(dir, { Eva: 40 }, 'clase-a')
+    const [copia] = await listRecordBackups(dir)
+    await fs.writeFile(join(dir, '.teuton-gui-records.json'), '{"version": 2, "classes": {')
+
+    const outcome = await restoreRecordBackup(dir, copia.id, 'clase-a')
+
+    expect(outcome).toMatchObject({ data: { Eva: 40 }, persisted: true })
+  })
+})
+

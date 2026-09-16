@@ -653,6 +653,10 @@ export async function listRecordBackups(dir: string): Promise<RecordBackup[]> {
 /**
  * Restaura una copia fusionando por máximo, igual que `updateRecords`: recuperar
  * notas antiguas nunca puede rebajar una nota que ya estuviera guardada.
+ *
+ * Solo toca la clase que se restaura (y el historial legado si es la manual):
+ * la copia de la hora también guarda a las otras clases, incluidas notas de
+ * práctica que el profesor ya había reiniciado.
  */
 export async function restoreRecordBackup(
   dir: string,
@@ -680,7 +684,11 @@ export async function restoreRecordBackup(
       // tal cual en vez de negarse a recuperar nada.
       current = { version: 2, classes: {} }
     }
-    const restored = mergeScoped(current, backup)
+    const scope = classScope(classId)
+    const only: ScopedRecords = { version: 2, classes: {} }
+    if (backup.classes[scope]) only.classes[scope] = backup.classes[scope]
+    if (scope === 'manual' && backup.legacy) only.legacy = backup.legacy
+    const restored = mergeScoped(current, only)
     try {
       await writeAtomic(recordsPath(dir), JSON.stringify(restored, null, 2))
     } catch (err) {

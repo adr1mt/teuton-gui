@@ -45,7 +45,7 @@ puede cambiar de modo entre pasadas (`setFakeMode`) y sembrar la clase activa.
 | S-05 | **RESOLVED** |
 | S-06 | **RESOLVED** |
 | S-07 | **RESOLVED** |
-| S-08 | pendiente |
+| S-08 | **RESOLVED** |
 | S-09 | pendiente |
 
 ### S-02 — RESOLVED
@@ -181,6 +181,18 @@ puede cambiar de modo entre pasadas (`setFakeMode`) y sembrar la clase activa.
 - **Verificado:** `npm run typecheck`, `npm test` (177), `npm run build`,
   `npm run test:e2e` (36); el E2E nuevo ×3 sin fallos.
 
+### S-08 — RESOLVED
+
+- **Causa raíz:** `restoreRecordBackup` fusionaba **todas** las clases de la
+  copia (`mergeScoped(current, backup)`), aunque la vista pedía una.
+- **Solución:** solo se fusiona `backup.classes[classScope(classId)]` (más el
+  historial legado si es el ámbito manual).
+- **Tests:** `store.test.ts` «restaurar para una clase no resucita las notas
+  reiniciadas de otra» (antes: B volvía a `{Pau: 80}`) y «con el historial
+  dañado sí restaura la copia». `copias-notas.spec.ts` sigue en verde.
+- **Verificado:** `npm run typecheck`, `npm test`, `npm run build`,
+  `npm run test:e2e` (36).
+
 ## Findings consolidados
 
 Los ID de origen enlazan al detalle (escenario, camino, test y arreglo).
@@ -201,7 +213,7 @@ Los ID de origen enlazan al detalle (escenario, camino, test y arreglo).
 | S-05 | A1-05 | **RESOLVED.** Historial ilegible → el CSV automático se reescribe con las notas de la última pasada, no con las mejores. |
 | S-06 | A2-01 | **RESOLVED.** Si `.teuton-gui-meta.json` no se puede escribir, no se guarda ninguna nota en todo el examen; el aviso es genérico. |
 | S-07 | A3-01 | **RESOLVED.** Un `teuton` colgado detiene el modo examen para siempre; el vigilante no actúa con `running`. `CLAUDE.md` afirma lo contrario. |
-| S-08 | A5-01 | Restaurar una copia para una clase resucita las notas de práctica de otra clase ya reiniciada. |
+| S-08 | A5-01 | **RESOLVED.** Restaurar una copia para una clase resucita las notas de práctica de otra clase ya reiniciada. |
 | S-09 | A5-02 | Restaurar con el historial sin permisos de lectura baja notas y dice «Notas restauradas». |
 
 ### Medium
