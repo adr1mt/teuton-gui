@@ -163,7 +163,7 @@ describe('las clases guardadas no pueden desaparecer', () => {
   })
 })
 
-describe('restaurar notas de una copia (S-08)', () => {
+describe('restaurar notas de una copia (S-08, S-09)', () => {
   async function project(): Promise<string> {
     runtime.userData = await fs.mkdtemp(join(tmpdir(), 'teuton-userdata-'))
     const dir = await fs.mkdtemp(join(tmpdir(), 'teuton-restore-'))
@@ -185,6 +185,23 @@ describe('restaurar notas de una copia (S-08)', () => {
     expect(outcome.data).toEqual({ Ana: 90 })
     expect(await getRecords(dir, 'clase-b')).toEqual({})
     expect(await getRecords(dir, 'clase-a')).toEqual({ Ana: 90 })
+  })
+
+  // G17: un historial que no se puede LEER (no dañado) tiene notas más nuevas
+  // que la copia; sustituirlo baja notas y encima dice «Notas restauradas».
+  it('con el historial sin permisos de lectura no restaura y lo dice', async () => {
+    const dir = await project()
+    await updateRecords(dir, { Eva: 40 }, 'clase-a')
+    const [copia] = await listRecordBackups(dir)
+    const file = join(dir, '.teuton-gui-records.json')
+    await fs.writeFile(file, JSON.stringify({ version: 2, classes: { 'class:clase-a': { Eva: 95 } } }))
+    await fs.chmod(file, 0o000)
+    try {
+      await expect(restoreRecordBackup(dir, copia.id, 'clase-a')).rejects.toThrow(/leer el historial/)
+    } finally {
+      await fs.chmod(file, 0o600)
+    }
+    expect(await getRecords(dir, 'clase-a')).toEqual({ Eva: 95 })
   })
 
   it('con el historial dañado sí restaura la copia', async () => {

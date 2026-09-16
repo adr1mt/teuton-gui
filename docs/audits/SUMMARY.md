@@ -46,7 +46,7 @@ puede cambiar de modo entre pasadas (`setFakeMode`) y sembrar la clase activa.
 | S-06 | **RESOLVED** |
 | S-07 | **RESOLVED** |
 | S-08 | **RESOLVED** |
-| S-09 | pendiente |
+| S-09 | **RESOLVED** |
 
 ### S-02 — RESOLVED
 
@@ -190,7 +190,23 @@ puede cambiar de modo entre pasadas (`setFakeMode`) y sembrar la clase activa.
 - **Tests:** `store.test.ts` «restaurar para una clase no resucita las notas
   reiniciadas de otra» (antes: B volvía a `{Pau: 80}`) y «con el historial
   dañado sí restaura la copia». `copias-notas.spec.ts` sigue en verde.
-- **Verificado:** `npm run typecheck`, `npm test`, `npm run build`,
+- **Verificado:** `npm run typecheck` y `npm test` sobre el commit aislado;
+  `npm run build` y `npm run test:e2e` (36) sobre el árbol con S-08 + S-09
+  (los dos cambios tocan solo `restoreRecordBackup`).
+
+### S-09 — RESOLVED
+
+- **Causa raíz:** el `catch` de `restoreRecordBackup` trataba cualquier fallo
+  de `readRecords` como «historial dañado» y partía de cero; con EACCES el
+  `rename` sustituía un historial con notas más nuevas por la copia.
+- **Solución:** `readRecords` lanza `CorruptRecordsError` solo cuando el
+  contenido no se puede interpretar; la restauración solo sigue en ese caso.
+  Un error de lectura se propaga y el panel muestra «No se pudieron restaurar
+  las notas: No se pudo leer el historial…».
+- **Tests:** `store.test.ts` «con el historial sin permisos de lectura no
+  restaura y lo dice» (antes: `{Eva: 40}` con `persisted: true` sobre un
+  fichero con 95).
+- **Verificado:** `npm run typecheck`, `npm test` (180), `npm run build`,
   `npm run test:e2e` (36).
 
 ## Findings consolidados
@@ -214,7 +230,7 @@ Los ID de origen enlazan al detalle (escenario, camino, test y arreglo).
 | S-06 | A2-01 | **RESOLVED.** Si `.teuton-gui-meta.json` no se puede escribir, no se guarda ninguna nota en todo el examen; el aviso es genérico. |
 | S-07 | A3-01 | **RESOLVED.** Un `teuton` colgado detiene el modo examen para siempre; el vigilante no actúa con `running`. `CLAUDE.md` afirma lo contrario. |
 | S-08 | A5-01 | **RESOLVED.** Restaurar una copia para una clase resucita las notas de práctica de otra clase ya reiniciada. |
-| S-09 | A5-02 | Restaurar con el historial sin permisos de lectura baja notas y dice «Notas restauradas». |
+| S-09 | A5-02 | **RESOLVED.** Restaurar con el historial sin permisos de lectura baja notas y dice «Notas restauradas». |
 
 ### Medium
 

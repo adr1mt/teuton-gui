@@ -369,6 +369,9 @@ function mergeTrimmedKeys(grades: GradeRecords): GradeRecords {
   return merged
 }
 
+/** El historial existe y se lee, pero su contenido no se puede interpretar. */
+class CorruptRecordsError extends Error {}
+
 async function readRecords(dir: string): Promise<ScopedRecords | null> {
   let raw: string
   try {
@@ -408,7 +411,7 @@ async function readRecords(dir: string): Promise<ScopedRecords | null> {
       return { version: 2, classes: {}, legacy: mergeTrimmedKeys(legacy) }
     }
   } catch (error) {
-    throw new Error(
+    throw new CorruptRecordsError(
       `El historial de notas está dañado y no se puede interpretar: ${error instanceof Error ? error.message : String(error)}`
     )
   }
@@ -678,10 +681,12 @@ export async function restoreRecordBackup(
     let current: ScopedRecords
     try {
       current = (await readRecords(dir)) ?? { version: 2, classes: {} }
-    } catch {
-      // El historial del proyecto no se puede interpretar; es precisamente el
-      // caso que esta función existe para arreglar, así que se restaura la copia
-      // tal cual en vez de negarse a recuperar nada.
+    } catch (error) {
+      // Un historial DAÑADO es precisamente el caso que esta función existe para
+      // arreglar: se restaura la copia en vez de negarse a recuperar nada. Uno
+      // que no se puede LEER (permisos, disco) puede tener notas más nuevas que
+      // la copia, y sustituirlo las bajaría: eso se para y se dice.
+      if (!(error instanceof CorruptRecordsError)) throw error
       current = { version: 2, classes: {} }
     }
     const scope = classScope(classId)
