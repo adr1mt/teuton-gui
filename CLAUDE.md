@@ -135,6 +135,7 @@ Each of these has a bug behind it. Read the one that covers what you are about t
 | any IPC handler that takes a path | Confined project paths |
 | the CSP, `index.html`, the vite config | CSP lives in two places |
 | the e2e suite, `scripts/fake-teuton.mjs` | Hostile UAT |
+| the updater, releases, the version number | Auto-update |
 
 **Config file colon-symbol format** (`lib/config.ts`). Teutón's config YAML is read by Ruby's `YAML.load`,
 which accepts both `tt_members: x` and the legacy Ruby-symbol style `:tt_members: x` (keys/values prefixed
@@ -339,6 +340,19 @@ rewrote it empty, taking every roster in the school with it.
 excludes Ruby gem bin directories. `teutonEnv()` resolves a login shell's `PATH` once and additionally
 scans `~/.local/share/gem/ruby/*/bin` and `~/.gem/ruby/*/bin`, so `teuton` is found even if the user never
 added it to their shell profile.
+
+**Auto-update** (`main/updater.ts`, `.github/workflows/release.yml`). Other teachers install a single
+AppImage from GitHub Releases; they have no Git, Node or clone, so `electron-updater` against the public
+`adr1mt/teuton-gui` repo is the only way a fix reaches them. It only arms itself when `app.isPackaged` and
+`process.env.APPIMAGE` is set — that variable is the path of the file to replace, absent in dev and in the
+`.deb`, which `electron-updater` cannot update at all. Three rules come from the classroom: it never even
+*checks* while exam mode is on (a download competing for bandwidth with twenty `ssh` sessions is exactly
+what must not happen mid-exam), it installs on quit (`autoInstallOnAppQuit`) and never on launch, and
+errors are logged but never shown — no network, no write permission on the AppImage or GitHub down must
+not put a dialog in front of the class. The teacher's own machine keeps using `scripts/instalar.sh`
+(`dist:linux` passes `--publish never`). A release is a tag: `package.json`'s `version` is what the updater
+compares, so the workflow refuses to publish when the tag and that version disagree — a `v1.1.0` Release
+holding a 1.1.0-labelled-1.0.0 AppImage would simply never update anyone.
 
 ## Security posture
 

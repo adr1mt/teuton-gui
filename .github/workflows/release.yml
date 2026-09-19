@@ -1,0 +1,40 @@
+# Publica una versión: `git tag v1.1.0 && git push origin v1.1.0`.
+# Compila el AppImage y lo sube al Release junto con `latest-linux.yml`, que es
+# lo que consulta la app instalada de cada profesor para saber si hay novedad.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # Una release rota se instala sola en los ordenadores de todo el mundo:
+      # nada se publica sin pasar antes typecheck y tests.
+      - run: npm run typecheck
+      - run: npm test
+      # La versión que instala el actualizador sale de package.json, no del tag:
+      # si no coinciden, el Release v1.1.0 contendría un AppImage 1.0.0 y nadie
+      # se actualizaría nunca.
+      - name: El tag y package.json deben coincidir
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          test "$tag" = "$pkg" || { echo "tag $tag != package.json $pkg"; exit 1; }
+      - run: npm run build
+      - name: Compilar y publicar
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --linux AppImage deb --publish always

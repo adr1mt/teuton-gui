@@ -17,6 +17,11 @@ const api: TeutonApi = {
     ipcRenderer.on(IPC.runEvent, listener)
     return () => ipcRenderer.removeListener(IPC.runEvent, listener)
   },
+  onUpdateReady: (cb) => {
+    const listener = (_e: unknown, version: string): void => cb(version)
+    ipcRenderer.on(IPC.updateReady, listener)
+    return () => ipcRenderer.removeListener(IPC.updateReady, listener)
+  },
   loadResults: (dir, testName, outDir) => ipcRenderer.invoke(IPC.loadResults, dir, testName, outDir),
   exportAs: (dir, format) => ipcRenderer.invoke(IPC.exportAs, dir, format),
   saveFileDialog: (defaultName, content) =>

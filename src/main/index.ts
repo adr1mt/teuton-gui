@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, session, shell } from 'electron'
 import { join } from 'node:path'
 import { hasActiveRuns, isExamModeActive, registerIpc, releaseKeepAwake, stopActiveRuns } from './ipc'
+import { initUpdater } from './updater'
 
 // Evita cuelgues de compositor/GPU habituales en Linux (causa típica de
 // "la ventana no responde"). La app es ligera y no necesita aceleración HW.
@@ -148,6 +149,7 @@ app.whenReady().then(() => {
   registerCsp()
   registerIpc()
   createWindow()
+  initUpdater()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

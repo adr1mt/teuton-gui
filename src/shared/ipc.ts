@@ -12,6 +12,7 @@ export const IPC = {
   runCancel: 'run:cancel',
   keepAwake: 'power:keepAwake',
   runEvent: 'run:event',
+  updateReady: 'update:ready',
   loadResults: 'results:load',
   exportAs: 'export:as',
   saveFileDialog: 'dialog:saveFile',

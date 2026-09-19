@@ -1,6 +1,6 @@
 {
   "name": "teuton-gui",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "GUI de escritorio para Teutón: gestión de proyectos, edición visual, ejecución y dashboard de evaluación",
   "homepage": "https://github.com/adr1mt/teuton-gui",
   "repository": {
@@ -28,7 +28,7 @@
     "verify:parsing": "esbuild scripts/verify-parsing.ts --bundle --platform=node --format=esm --outfile=/tmp/teuton-verify.mjs --external:electron && node /tmp/teuton-verify.mjs",
     "verify:preload": "node scripts/verify-preload.mjs",
     "dist": "npm run build && electron-builder",
-    "dist:linux": "npm run build && electron-builder --linux AppImage deb",
+    "dist:linux": "npm run build && electron-builder --linux AppImage deb --publish never",
     "icon": "python3 scripts/make-icon.py",
     "test:e2e": "playwright test",
     "screenshot": "esbuild scripts/screenshot.ts --bundle --platform=node --format=esm --outfile=/tmp/teuton-shot.mjs --external:electron && node_modules/electron/dist/electron /tmp/teuton-shot.mjs --no-sandbox"
@@ -52,6 +52,11 @@
         "to": "icon.png"
       }
     ],
+    "publish": {
+      "provider": "github",
+      "owner": "adr1mt",
+      "repo": "teuton-gui"
+    },
     "linux": {
       "artifactName": "Teuton-GUI-${version}.${ext}",
       "icon": "build/icons",
@@ -72,6 +77,7 @@
     }
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "js-yaml": "^4.3.1"
   },
   "devDependencies": {

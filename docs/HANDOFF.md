@@ -11,13 +11,27 @@ Dejar la app lista para un examen real según el gate de
 - Critical y High: S-01 a S-09 RESOLVED.
 - Medium del gate: S-11, S-14, S-17 y S-21 RESOLVED, ninguno aceptado como
   riesgo. Causa, arreglo, tests y riesgo residual de cada uno en `SUMMARY.md`.
+- Verificado el 2026-09-19 con la actualización automática: `npm run typecheck`,
+  `npm test` (192), `npm run test:e2e` (40/42; los 2 de `instancia-unica.spec.ts`
+  fallan también sin estos cambios: el escritorio no restaura la ventana
+  minimizada en esta sesión X, no es regresión) y `./scripts/instalar.sh
+  --forzar`.
 - Verificado el 2026-09-16: `npm run typecheck`, `npm test` (192),
   `npm run build`, `npm run test:e2e` (42, empaquetada incluida),
   `./scripts/instalar.sh --forzar` y dos arranques del AppImage instalado.
 
 ## In progress
 
-Nada.
+Actualización automática (repo ya público). Falta publicar la primera release:
+
+```
+git tag v1.1.0 && git push origin v1.1.0
+```
+
+Eso dispara `.github/workflows/release.yml`, que compila el AppImage y sube el
+Release con `latest-linux.yml`. A partir de ahí cada app instalada se actualiza
+sola (`src/main/updater.ts`): comprueba 30 s después de abrir, nunca en modo
+examen, e instala al cerrar. Solo funciona en el AppImage, no en el `.deb`.
 
 ## Next
 
@@ -28,6 +42,8 @@ Solo quedan las pruebas con personas y máquinas reales:
    (incluido un alumno con la máquina apagada: «—» y fuera del CSV).
 2. Prueba manual de disco lleno (`docs/UAT.md`).
 3. Prueba manual de suspensión con el modo examen activo (`docs/UAT.md`).
+4. Comprobar la actualización de punta a punta: publicar v1.1.0, bajar el
+   AppImage a otro ordenador y publicar v1.1.1 para ver si se actualiza solo.
 
 No tocar el resto de Medium (S-10, S-12, S-13, S-15, S-16, S-18-S-20) ni los
 Low hasta después del ensayo.
@@ -47,6 +63,8 @@ sigue igual.
 ## Constraints
 
 - Tras tocar código: `./scripts/instalar.sh` o se prueba la versión anterior.
+- Publicar una versión = subir `version` en `package.json` y empujar el tag
+  `v<misma versión>`; el workflow falla si no coinciden.
 - `npm run test:e2e` no compila (antes `npm run build`), necesita `DISPLAY` y,
   para el escenario 15, haber empaquetado.
 - En este repo los comentarios van en español.

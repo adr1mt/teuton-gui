@@ -260,6 +260,8 @@ export interface TeutonApi {
   /** Impide que el ordenador se suspenda y que la pantalla se apague. */
   keepAwake: (active: boolean) => Promise<void>
   onRunEvent: (cb: (event: RunEvent) => void) => () => void
+  /** Hay una actualización descargada; se instalará al cerrar la app. */
+  onUpdateReady: (cb: (version: string) => void) => () => void
   /** `outDir`: el `tt_outdir` del config (relativo al proyecto), si lo hay. */
   loadResults: (dir: string, testName?: string, outDir?: string) => Promise<LoadedResults>
   exportAs: (dir: string, format: ExportFormat) => Promise<CheckResult>

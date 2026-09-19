@@ -70,6 +70,17 @@ function AppBody() {
 
   useRunManager()
 
+  // Actualización ya descargada: el aviso solo informa, la instalación ocurre
+  // sola al cerrar la app (ver src/main/updater.ts).
+  useEffect(() => {
+    return window.teuton.onUpdateReady((version) => {
+      setOperationalError(
+        `Hay una versión nueva de Teutón GUI (${version}). Se instalará sola al cerrar la aplicación.`,
+        { info: true }
+      )
+    })
+  }, [setOperationalError])
+
   useEffect(() => {
     void Promise.all([
       window.teuton.detect().then(setTeutonStatus),

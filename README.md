@@ -40,6 +40,12 @@ Descarga el paquete de la [última release](https://github.com/adr1mt/teuton-gui
   chmod +x Teuton-GUI-*.AppImage && ./Teuton-GUI-*.AppImage
   ```
 
+**El AppImage se actualiza solo.** Al abrirlo comprueba si hay una versión nueva, la descarga en segundo
+plano y la instala al cerrar la aplicación; verás un aviso cuando esté lista. Nunca se actualiza mientras
+el **modo examen** está activo. Para que funcione, el fichero `.AppImage` debe estar en una carpeta donde
+tengas permiso de escritura (tu carpeta personal, por ejemplo). El `.deb` no se actualiza solo: para
+actualizarlo hay que descargar el nuevo paquete.
+
 ## Ejecución desde el código
 
 ```bash
