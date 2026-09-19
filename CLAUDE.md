@@ -352,7 +352,9 @@ errors are logged but never shown — no network, no write permission on the App
 not put a dialog in front of the class. The teacher's own machine keeps using `scripts/instalar.sh`
 (`dist:linux` passes `--publish never`). A release is a tag: `package.json`'s `version` is what the updater
 compares, so the workflow refuses to publish when the tag and that version disagree — a `v1.1.0` Release
-holding a 1.1.0-labelled-1.0.0 AppImage would simply never update anyone.
+holding a 1.1.0-labelled-1.0.0 AppImage would simply never update anyone. `releaseType: 'release'` is
+there because electron-builder publishes a *draft* by default, and a draft Release is invisible to
+everyone including the updater: the tag succeeded, the workflow was green, and nobody got the update.
 
 ## Security posture
 

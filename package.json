@@ -55,7 +55,8 @@
     "publish": {
       "provider": "github",
       "owner": "adr1mt",
-      "repo": "teuton-gui"
+      "repo": "teuton-gui",
+      "releaseType": "release"
     },
     "linux": {
       "artifactName": "Teuton-GUI-${version}.${ext}",

@@ -22,16 +22,16 @@ Dejar la app lista para un examen real según el gate de
 
 ## In progress
 
-Actualización automática (repo ya público). Falta publicar la primera release:
+Nada. La v1.1.0 ya está publicada:
+<https://github.com/adr1mt/teuton-gui/releases/tag/v1.1.0>
 
-```
-git tag v1.1.0 && git push origin v1.1.0
-```
+Cada app instalada se actualiza sola (`src/main/updater.ts`): comprueba 30 s
+después de abrir, nunca en modo examen, e instala al cerrar. Solo el AppImage,
+no el `.deb`.
 
-Eso dispara `.github/workflows/release.yml`, que compila el AppImage y sube el
-Release con `latest-linux.yml`. A partir de ahí cada app instalada se actualiza
-sola (`src/main/updater.ts`): comprueba 30 s después de abrir, nunca en modo
-examen, e instala al cerrar. Solo funciona en el AppImage, no en el `.deb`.
+Publicar una versión nueva: subir `version` en `package.json`, commitear y
+empujar el tag `v<esa versión>`. El resto lo hace
+`.github/workflows/release.yml`.
 
 ## Next
 
@@ -42,8 +42,8 @@ Solo quedan las pruebas con personas y máquinas reales:
    (incluido un alumno con la máquina apagada: «—» y fuera del CSV).
 2. Prueba manual de disco lleno (`docs/UAT.md`).
 3. Prueba manual de suspensión con el modo examen activo (`docs/UAT.md`).
-4. Comprobar la actualización de punta a punta: publicar v1.1.0, bajar el
-   AppImage a otro ordenador y publicar v1.1.1 para ver si se actualiza solo.
+4. Comprobar la actualización de punta a punta: bajar el AppImage de la v1.1.0
+   a otro ordenador y publicar una v1.1.1 para ver si se actualiza solo.
 
 No tocar el resto de Medium (S-10, S-12, S-13, S-15, S-16, S-18-S-20) ni los
 Low hasta después del ensayo.
