@@ -33,6 +33,10 @@ Publicar una versión nueva: subir `version` en `package.json`, commitear y
 empujar el tag `v<esa versión>`. El resto lo hace
 `.github/workflows/release.yml`.
 
+El README es ahora la portada pública: qué es, créditos a Teutón, instalación
+en Ubuntu, uso en cuatro pasos y capturas de `docs/img/` (se regeneran con
+`node scripts/capturas.mjs`, con alumnado inventado).
+
 ## Next
 
 Solo quedan las pruebas con personas y máquinas reales:

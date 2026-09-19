@@ -1,174 +1,179 @@
+<div align="center">
+
 # Teutón GUI
 
-Aplicación de escritorio (Linux) para usar **[Teutón](https://github.com/teuton-software/teuton)** de
-forma visual: gestión de proyectos, edición de tests, ejecución y un **dashboard de evaluación** pensado
-para el aula.
+**Corrige las prácticas de toda una clase a la vez, y proyecta el resultado en directo.**
 
-Es un **envoltorio visual sobre el CLI `teuton`**: toda la ejecución y la puntuación las realiza Teutón;
-esta GUI se limita a lanzar el comando, editar los ficheros y mostrar los resultados que Teutón exporta
-en JSON. No reimplementa nada de la lógica de evaluación.
+Aplicación de escritorio para Linux que pone pantalla a **[Teutón](https://github.com/teuton-software/teuton)**,
+el corrector automático de infraestructura.
 
-> ⚠️ Este proyecto **no es** el software Teutón. Es una interfaz gráfica independiente construida sobre él.
-> Todo el mérito del motor de evaluación es de **[teuton-software/teuton](https://github.com/teuton-software/teuton)**.
+<img src="docs/img/matriz.png" width="820" alt="Matriz de objetivos por alumno">
 
-## Créditos
+</div>
 
-- **Teutón** (motor de evaluación) — David Vargas Ruiz y colaboradores.
-  <https://github.com/teuton-software/teuton> · Licencia MPL-2.0.
-- **Teutón GUI** (esta interfaz) — Adrià Muñoz · `amuno123@xtec.cat`.
+---
 
-Esta GUI se publica bajo la misma licencia que Teutón (**MPL-2.0**) en señal de respeto y continuidad.
+## ¿Qué es esto?
 
-## Requisitos
+Imagina un examen de servicios en red: veinte alumnos, cada uno con su máquina, y hay que comprobar si el
+servidor web arranca, si el cortafuegos está abierto, si el usuario existe. Ir máquina por máquina es
+imposible en una hora de clase.
 
-- **Node.js 20+** y npm (solo para desarrollo/compilación).
-- **Ruby 3.2+** con la gema Teutón:
-  ```bash
-  gem install teuton
-  ```
-  La app detecta `teuton` automáticamente (incluso si el directorio de binarios de gemas de usuario no está
-  en el `PATH`). Si no lo encuentra, muestra instrucciones en **Ajustes**.
+**Teutón** hace esas comprobaciones solo, por SSH, y pone nota. **Teutón GUI** es la pantalla desde la que
+lo manejas: apuntas los alumnos en una tabla, le das a ejecutar, y ves quién va bien y quién está
+atascado. Sin abrir una terminal.
 
-## Instalación
+Está pensada para usarse **durante** el examen, proyectada en clase, no solo para corregir al acabar.
 
-Descarga el paquete de la [última release](https://github.com/adr1mt/teuton-gui/releases/latest):
+## ¿Y qué es Teutón?
 
-- **`.deb`** — instálalo con doble clic (o `sudo dpkg -i teuton-gui_*.deb`). Deja **Teutón GUI** en
-  el menú de aplicaciones, con su icono.
-- **`.AppImage`** — dale permiso de ejecución y ábrelo, sin instalar nada:
-  ```bash
-  chmod +x Teuton-GUI-*.AppImage && ./Teuton-GUI-*.AppImage
-  ```
+[**Teutón**](https://github.com/teuton-software/teuton) es el motor que hace todo el trabajo de verdad: se
+conecta a las máquinas, lanza las comprobaciones que tú has escrito y calcula la nota. Es una gema de Ruby,
+software libre, creada por **David Vargas Ruiz** y sus colaboradores.
 
-**El AppImage se actualiza solo.** Al abrirlo comprueba si hay una versión nueva, la descarga en segundo
-plano y la instala al cerrar la aplicación; verás un aviso cuando esté lista. Nunca se actualiza mientras
-el **modo examen** está activo. Para que funcione, el fichero `.AppImage` debe estar en una carpeta donde
-tengas permiso de escritura (tu carpeta personal, por ejemplo). El `.deb` no se actualiza solo: para
-actualizarlo hay que descargar el nuevo paquete.
+> Esta aplicación **no es** Teutón. Es una interfaz independiente construida encima. Todo el mérito del
+> motor de evaluación es de [teuton-software/teuton](https://github.com/teuton-software/teuton).
+>
+> La GUI no reimplementa nada de la corrección: llama al programa `teuton` y muestra lo que este responde.
 
-## Ejecución desde el código
+Si Teutón te resulta útil, el repositorio que hay que estrellar es el suyo.
+
+## Instalación en Ubuntu
+
+Vale cualquier distribución basada en Ubuntu (Linux Mint, Pop!\_OS, Zorin…).
+
+**1. Instala Teutón**, que es el motor. Necesita Ruby:
 
 ```bash
-./launch.sh        # compila si hace falta y abre la app (recomendado)
+sudo apt install ruby
+gem install teuton
 ```
 
-Para dejarla en el **menú de aplicaciones** — compila el AppImage, lo instala en `/mnt/datos` y crea la
-entrada con su icono:
+**2. Descarga la aplicación.** Ve a la [última versión](https://github.com/adr1mt/teuton-gui/releases/latest)
+y descarga el fichero que acaba en **`.AppImage`**.
+
+**3. Dale permiso para ejecutarse.** Clic derecho sobre el fichero → *Propiedades* → *Permisos* → marca
+**«Permitir ejecutar el archivo como un programa»**. Luego ábrelo con doble clic.
+
+Guárdalo en una carpeta tuya (por ejemplo `Documentos` o el Escritorio), **no** en una carpeta del sistema:
+la aplicación necesita poder reescribirse a sí misma para actualizarse.
+
+<details>
+<summary>Prefiero hacerlo desde la terminal</summary>
 
 ```bash
-./scripts/instalar.sh
+chmod +x Teuton-GUI-*.AppImage
+./Teuton-GUI-*.AppImage
 ```
 
-`--forzar` recompila aunque no detecte cambios; `--desinstalar` la quita del menú y borra el ejecutable.
+También hay un paquete `.deb` en la misma página, si prefieres que quede instalado en el menú de
+aplicaciones. Ese **no** se actualiza solo: para cambiar de versión hay que descargar el `.deb` nuevo.
 
-o en modo desarrollo con recarga en caliente:
+</details>
+
+## Se mantiene actualizada sola
+
+No hay que hacer nada. Cada vez que abres la aplicación, mira si hay una versión nueva y se la descarga
+en segundo plano. Verás un aviso:
+
+> Hay una versión nueva de Teutón GUI (1.1.1). Se instalará sola al cerrar la aplicación.
+
+La actualización se aplica **al cerrar**, nunca mientras estás trabajando. Y si el **modo examen** está
+activo, ni siquiera comprueba si la hay: durante un examen la conexión es para las máquinas de los alumnos.
+
+Esto solo funciona con el `.AppImage`, y solo si está guardado en una carpeta donde tengas permiso de
+escritura.
+
+## Cómo se usa
+
+### 1. Apunta a tu alumnado
+
+El examen es una carpeta con dos ficheros: `start.rb` (qué se comprueba) y `config.yaml` (a quién).
+La tabla es ese segundo fichero: una fila por alumno, con su identificador de Moodle y la IP de su máquina.
+
+Si ya tienes el grupo guardado en **Clases**, lo traes entero con **Importar clase**. Los grupos se crean
+en segundos pegando tres columnas desde una hoja de cálculo: nombre, correo e IP.
+
+<img src="docs/img/editor.png" width="820" alt="Tabla de alumnos del examen">
+
+### 2. Lanza la corrección
+
+**¿Todo listo?** revisa de antemano lo que suele fallar: que Teutón esté instalado, que el fichero no tenga
+errores, que no falte ninguna IP. Mejor descubrirlo antes que con la clase sentada.
+
+**Modo examen** repite la corrección cada pocos minutos, sola, hasta que la pares. Es lo que se proyecta en
+clase: cada alumno ve su nota subir según va resolviendo.
+
+<img src="docs/img/ejecutar.png" width="820" alt="Pantalla de ejecución con el modo examen">
+
+### 3. Mira quién necesita ayuda
+
+Cada alumno, su nota y cuántas comprobaciones ha superado. Un aviso aparte marca a quien tiene **la máquina
+apagada o sin red**, que desde fuera se parece mucho a quien no ha hecho nada, pero necesita justo lo
+contrario.
+
+<img src="docs/img/resultados.png" width="820" alt="Lista de alumnos con sus notas">
+
+La vista **Matriz** lo enseña todo de un vistazo: una fila por comprobación, una columna por alumno. Si una
+fila está roja entera, el problema no es de nadie en particular: es del enunciado.
+
+### 4. Pon las notas
+
+Las **Analíticas** dicen a quién hay que atender primero, qué comprobación falla más gente y cómo se
+reparten las notas del grupo.
+
+<img src="docs/img/analiticas.png" width="820" alt="Analíticas del examen">
+
+Al acabar, **Exportar** genera el CSV que Moodle importa tal cual.
+
+> La aplicación lleva dentro un apartado de **Ayuda** con el manual completo, por si te pierdes en algún
+> paso.
+
+## Detalles que importan en un examen de verdad
+
+- **Se guarda siempre la mejor nota de cada alumno.** Quien termina con un 10 y apaga la máquina no pierde
+  el 10 porque la pasada siguiente ya no le encuentre.
+- **La nota es tuya.** Teutón puntúa sobre 100; tú decides la escala («70 puntos = un 5»).
+- **Un grupo no pisa a otro.** El mismo examen se puede pasar a varias clases: cada una lleva su historial
+  y su propio CSV, aunque dos alumnos de grupos distintos se llamen igual.
+- **Copias de seguridad de las notas cada hora**, fuera de la carpeta del examen. Si borras el proyecto o
+  reinicias el historial por error, se recuperan.
+- **Modo proyector**: agranda la letra y **tapa las IPs y las contraseñas** antes de enchufar el cañón.
+- **El ordenador no se suspende** mientras el modo examen está activo.
+
+## Para desarrolladores
+
+Electron + React + TypeScript. La aplicación nunca reimplementa la lógica de Teutón: lanza el CLI y lee los
+JSON que este exporta.
 
 ```bash
 npm install
-npm run dev
+npm run dev          # desarrollo con recarga en caliente
+npm test             # tests unitarios
+npm run test:e2e     # UAT sobre la app real (necesita DISPLAY)
+npm run dist:linux   # AppImage + .deb en dist/
 ```
 
-## Empaquetado
+| Documento | Contiene |
+|---|---|
+| [`CLAUDE.md`](CLAUDE.md) | Arquitectura y los mecanismos no evidentes, uno por uno |
+| [`docs/PRODUCT.md`](docs/PRODUCT.md) | Para qué es la aplicación y para quién |
+| [`docs/DESIGN.md`](docs/DESIGN.md) | Decisiones de interfaz y sistema visual |
+| [`docs/UAT.md`](docs/UAT.md) | Los ataques que la suite hostil automatiza |
 
-```bash
-npm run dist:linux   # genera AppImage y .deb en dist/
-```
+Publicar una versión: subir `version` en `package.json`, commitear y empujar el tag `v<esa versión>`.
+GitHub Actions compila, pasa los tests y publica la release que reciben los demás.
 
-El icono se genera con `npm run icon` (script sin dependencias) y queda en `build/icon.png`.
+Para ver las pantallas con datos sin montar máquinas virtuales, `node scripts/make-demo-project.mjs`
+escribe en `sandbox/examen-demo/` un cuestionario de redes con 15 alumnos inventados y notas repartidas a
+propósito; se abre desde Inicio y no necesita SSH.
 
-## Estructura del repositorio
+Las capturas de este README se regeneran con `node scripts/capturas.mjs` (también con alumnos inventados).
 
-```
-src/          código de la app (main · preload · renderer · shared)
-tests/        tests unitarios (vitest)
-scripts/      utilidades: icono, lanzador de escritorio, verificación, demo
-build/        recursos de empaquetado (icono)
-docs/         diseño, producto y notas de traspaso
-sandbox/      proyectos de prueba locales (fuera de git)
-```
+## Créditos y licencia
 
-## Funcionalidades
+- **Teutón**, el motor de evaluación — David Vargas Ruiz y colaboradores ·
+  [teuton-software/teuton](https://github.com/teuton-software/teuton) · MPL-2.0
+- **Teutón GUI**, esta interfaz — Adrià Muñoz, profesor de informática en el Institut El Puig
 
-- **Inicio** — abrir/crear proyectos y lista de recientes.
-- **Editor** — `start.rb` con editor de código (Monaco, resaltado Ruby) y `config.yaml` en **tabla visual**
-  (una fila por alumno; añade IP/usuario/contraseña con un clic, contraseñas enmascaradas) o YAML crudo.
-  Botón **Validar** (`teuton check`). Importar una **clase** guardada con un clic.
-- **Ejecutar** — selección de casos, consola en vivo, cancelar y re-ejecutar. La ejecución **continúa en
-  segundo plano** aunque cambies de pestaña.
-- **Modo examen** — re-evalúa a todos los alumnos automáticamente cada N minutos, con cuenta atrás y
-  dashboard que se refresca solo. Ideal para **proyectar el progreso al alumnado en tiempo real**.
-- **Resultados** — tabla de alumnos con nota, superados, errores de conexión, **récord histórico** y nota
-  convertida; vista **matriz** (objetivos × alumnos); detalle por alumno; export a **Moodle (CSV)**.
-- **Analíticas** — objetivos fallados con más frecuencia, distribución de notas y tasa de éxito por grupo.
-- **Clases** — guarda tus grupos de alumnos y reutilízalos en cada examen. Crea una clase en segundos
-  **pegando desde Excel** tres columnas: Nombre · Email (ID de Moodle) · IP.
-- **Ajustes** — **nota configurable** (p.ej. 70 pts = 5, 100 pts = 10), **credenciales por defecto**
-  (usuario/contraseña de las máquinas, aplicadas a todos los proyectos al importar una clase) y tema
-  claro/oscuro.
-- **Ayuda** — manual completo dentro de la app que explica todo el flujo, con índice navegable.
-
-### Nota configurable y récord (pensado para exámenes)
-
-La nota de Teutón (0-100) se convierte a tu escala mediante una recta a trozos que pasa por
-`(0, 0)`, `(puntos_de_aprobado, mitad_de_la_escala)` y `(100, nota_máxima)`.
-
-Se guarda **siempre la mejor nota** de cada alumno entre ejecuciones. Así, si un alumno termina el examen,
-saca un 10 y apaga su máquina, la exportación a Moodle usa ese 10 y no el 0 de una pasada posterior.
-El historial queda separado por clase, incluso si dos grupos comparten alumnos con el mismo nombre. Cada
-clase genera además su propio CSV en `informes/`, identificado de forma estable para que dos clases con
-el mismo título tampoco se sobrescriban.
-
-«Cargar últimos resultados» atribuye las notas a la clase con la que se hizo esa ejecución, aunque hayas
-cambiado de grupo después. Y si haces una pasada de prueba antes del examen real, el botón **Reiniciar
-historial** del dashboard borra el récord de la clase activa para empezar de cero.
-
-## Arquitectura
-
-- `src/main` — proceso principal Electron: wrapper del CLI (`teuton.ts`), gestión de proyectos, parser de
-  resultados, persistencia (ajustes/clases/récords) y handlers IPC.
-- `src/preload` — puente seguro (`contextBridge`) que expone `window.teuton`.
-- `src/renderer` — interfaz React + TypeScript + Tailwind.
-- `src/shared` — tipos y canales IPC compartidos.
-
-**Seguridad**: `contextIsolation` activado, `nodeIntegration` desactivado, CSP restrictiva, navegación
-externa bloqueada (los enlaces se abren en el navegador del sistema con lista blanca de esquemas), y las
-llamadas al CLI usan `spawn`/`execFile` con argumentos (sin shell, sin inyección de comandos).
-
-## Contrato de datos con Teutón
-
-`teuton run --export=json` genera en `<proyecto>/var/<test>/`: `case-NN.json` (detalle por alumno),
-`resume.json` (agregado) y `moodle.csv`. La GUI parsea estos ficheros para el dashboard y las analíticas.
-
-## Verificación
-
-```bash
-# Valida el parser y las analíticas contra la salida real de teuton:
-node_modules/.bin/esbuild scripts/verify-parsing.ts --bundle --platform=node \
-  --format=esm --outfile=/tmp/verify.mjs --external:electron
-node /tmp/verify.mjs <ruta/proyecto/ya/ejecutado>
-```
-
-`scripts/screenshot.ts` es un smoke test visual que arranca la app y captura una imagen.
-
-## Proyecto de demostración
-
-Para ver la pantalla con datos realistas sin montar máquinas virtuales, abre en Inicio
-la carpeta `sandbox/examen-demo/`. Es un cuestionario de 10 preguntas de redes con 15
-alumnos inventados. No usa SSH: cada comprobación compara en local la respuesta que el
-alumno lleva en su ficha. La clase **DEMO-15** ya está guardada en Clases y el proyecto
-la tiene como clase activa.
-
-Las notas están repartidas a propósito para ver la pantalla en todos sus estados
-(escala del profesor, con el aprobado en 70 puntos): cuatro **10,00**, tres **8,33**,
-dos **6,67**, dos justo en el **5,00** y cuatro suspensos (**3,57**, **3,57**, **2,14**
-y **0,71**). Salen **11 aprobados de 15**, media **5,67**.
-
-Para rehacerla desde cero (o cambiar las notas: se editan en la tabla `ROSTER`):
-
-```bash
-node scripts/make-demo-project.mjs
-```
-
-## Licencia
-
-[MPL-2.0](LICENSE) — igual que Teutón.
+Publicada bajo [**MPL-2.0**](LICENSE), la misma licencia que Teutón, en señal de respeto y continuidad.
